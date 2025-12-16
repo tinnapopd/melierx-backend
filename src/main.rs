@@ -1,26 +1,28 @@
-use actix_web::{App, HttpResponse, HttpServer, Responder, get, post, web};
+use actix_web::{App, HttpServer, web};
+use std::sync::Mutex;
+mod controllers;
+mod db;
 
-#[get("/")]
-async fn hello() -> impl Responder {
-    HttpResponse::Ok().body("Hello world!")
-}
-
-#[post("/echo")]
-async fn echo(req_body: String) -> impl Responder {
-    HttpResponse::Ok().body(req_body)
-}
-
-async fn manual_hello() -> impl Responder {
-    HttpResponse::Ok().body("Hey there!")
+pub struct AppState {
+    db: Mutex<sqlx::postgres::PgPool>,
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    HttpServer::new(|| {
+    dotenvy::dotenv().ok();
+    let state = web::Data::new(AppState {
+        db: Mutex::new(
+            sqlx::postgres::PgPool::connect(&std::env::var("DATABASE_URL").unwrap())
+                .await
+                .unwrap(),
+        ),
+    });
+    HttpServer::new(move || {
         App::new()
-            .service(hello)
-            .service(echo)
-            .route("/hey", web::get().to(manual_hello))
+            .service(controllers::auth::sign_up)
+            .service(controllers::auth::sign_in)
+            .service(controllers::me::get_profile)
+            .service(controllers::me::update_profile)
     })
     .bind(("127.0.0.1", 8080))?
     .run()
