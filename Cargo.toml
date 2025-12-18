@@ -13,8 +13,11 @@ name = "melierx-backend"
 
 [dependencies]
 actix-web = "4"
+chrono = "0.4.42"
+config = "0.15.19"
 reqwest = "0.12.26"
 serde = { version = "1.0.228", features = ["derive"] }
+uuid = { version = "1.19.0", features = ["v4"] }
 
 [dependencies.sqlx]
 version = "0.8.6"
