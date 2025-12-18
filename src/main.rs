@@ -1,4 +1,4 @@
-use melierx_backend::run;
+use melierx_backend::startup::run;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
