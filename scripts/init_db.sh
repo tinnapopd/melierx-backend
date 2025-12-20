@@ -35,6 +35,8 @@ DB_PORT=${POSTGRES_PORT:-5432}
 # Use: SKIP_DOCKER=1 ./scripts/init_db.sh
 if [[ -z "${SKIP_DOCKER}" ]]; 
 then
+    # Remove any previous postgres docker container
+    docker rm -f postgres || true
     docker run \
         --name postgres \
         -e POSTGRES_USER=$DB_USER \
