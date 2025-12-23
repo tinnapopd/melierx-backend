@@ -4,6 +4,7 @@ use tracing_log::LogTracer;
 use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt};
 
+// Public Functions
 /// Compose multiple layers into a single subscriber
 pub fn get_subscriber(
     name: String,

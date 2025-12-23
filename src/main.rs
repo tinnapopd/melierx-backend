@@ -1,8 +1,9 @@
+use sqlx::postgres::PgPoolOptions;
+use std::net::TcpListener;
+
 use melierx_backend::configuration::get_configuration;
 use melierx_backend::startup::run;
 use melierx_backend::telemetry::{get_subscriber, init_subscriber};
-use sqlx::postgres::PgPoolOptions;
-use std::net::TcpListener;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {

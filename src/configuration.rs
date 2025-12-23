@@ -4,10 +4,10 @@ use sqlx::ConnectOptions;
 use sqlx::postgres::PgConnectOptions;
 use sqlx::postgres::PgSslMode;
 
-#[derive(serde::Deserialize)]
-pub struct Settings {
-    pub database: DatabaseSettings,
-    pub application: ApplicationSettings,
+// Public Types
+pub enum Environment {
+    Local,
+    Production,
 }
 
 #[derive(serde::Deserialize)]
@@ -17,11 +17,23 @@ pub struct ApplicationSettings {
     pub port: u16,
 }
 
-pub enum Environment {
-    Local,
-    Production,
+#[derive(serde::Deserialize)]
+pub struct DatabaseSettings {
+    pub host: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub port: u16,
+    pub database_name: String,
+    pub username: String,
+    pub password: SecretString,
+    pub require_ssl: bool,
+}
+#[derive(serde::Deserialize)]
+pub struct Settings {
+    pub database: DatabaseSettings,
+    pub application: ApplicationSettings,
 }
 
+// Implementations
 impl Environment {
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -46,6 +58,30 @@ impl TryFrom<String> for Environment {
     }
 }
 
+impl DatabaseSettings {
+    pub fn with_db(&self) -> PgConnectOptions {
+        self.without_db()
+            .database(&self.database_name)
+            .log_statements(tracing::log::LevelFilter::Trace)
+    }
+
+    pub fn without_db(&self) -> PgConnectOptions {
+        let ssl_mode = if self.require_ssl {
+            PgSslMode::Require
+        } else {
+            // Try an encrypted connection, fall back to unencrypted if not available
+            PgSslMode::Prefer
+        };
+        PgConnectOptions::new()
+            .host(&self.host)
+            .port(self.port)
+            .username(&self.username)
+            .password(self.password.expose_secret())
+            .ssl_mode(ssl_mode)
+    }
+}
+
+// Public Functions
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
     let base_path = std::env::current_dir().expect("Failed to determine the current directory");
     let configuration_directory = base_path.join("configuration");
@@ -69,38 +105,4 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
         .build()?;
 
     settings.try_deserialize()
-}
-
-#[derive(serde::Deserialize)]
-pub struct DatabaseSettings {
-    pub host: String,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub port: u16,
-    pub database_name: String,
-    pub username: String,
-    pub password: SecretString,
-    pub require_ssl: bool,
-}
-
-impl DatabaseSettings {
-    pub fn with_db(&self) -> PgConnectOptions {
-        self.without_db()
-            .database(&self.database_name)
-            .log_statements(tracing::log::LevelFilter::Trace)
-    }
-
-    pub fn without_db(&self) -> PgConnectOptions {
-        let ssl_mode = if self.require_ssl {
-            PgSslMode::Require
-        } else {
-            // Try an encrypted connection, fall back to unencrypted if not available
-            PgSslMode::Prefer
-        };
-        PgConnectOptions::new()
-            .host(&self.host)
-            .port(self.port)
-            .username(&self.username)
-            .password(self.password.expose_secret())
-            .ssl_mode(ssl_mode)
-    }
 }

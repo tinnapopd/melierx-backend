@@ -1,16 +1,31 @@
-use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
 use actix_web::{HttpResponse, web};
 use chrono::Utc;
 use sqlx::PgPool;
 use unicode_segmentation::UnicodeSegmentation;
 use uuid::Uuid;
 
+use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
+
+// Public Types
+/// Form data structure for new subscriber
 #[derive(serde::Deserialize)]
 pub struct FormData {
     email: String,
     name: String,
 }
 
+// Implementations
+impl TryFrom<FormData> for NewSubscriber {
+    type Error = String;
+
+    fn try_from(value: FormData) -> Result<Self, Self::Error> {
+        let name = SubscriberName::parse(value.name)?;
+        let email = SubscriberEmail::parse(value.email)?;
+        Ok(Self { email, name })
+    }
+}
+
+// Public Functions
 /// Returns `true` if the provided name is valid, `false` otherwise.
 pub fn is_valid_name(s: &str) -> bool {
     let is_empty_or_whitespace = s.trim().is_empty();
@@ -20,6 +35,7 @@ pub fn is_valid_name(s: &str) -> bool {
     !(is_empty_or_whitespace || is_too_long || contains_forbidden_characters)
 }
 
+/// Inserts a new subscriber into the database.
 #[tracing::instrument(
     name = "Saving new subscriber details in the database",
     skip(new_subscriber, pool)
@@ -47,16 +63,7 @@ pub async fn insert_subscriber(
     Ok(())
 }
 
-impl TryFrom<FormData> for NewSubscriber {
-    type Error = String;
-
-    fn try_from(value: FormData) -> Result<Self, Self::Error> {
-        let name = SubscriberName::parse(value.name)?;
-        let email = SubscriberEmail::parse(value.email)?;
-        Ok(Self { email, name })
-    }
-}
-
+/// Handles subscription requests.
 #[tracing::instrument(
     name = "Adding a new subscriber",
     skip(form, pool),

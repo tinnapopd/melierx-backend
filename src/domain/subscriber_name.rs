@@ -1,8 +1,10 @@
 use unicode_segmentation::UnicodeSegmentation;
 
+// Public Types
 #[derive(Debug)]
 pub struct SubscriberName(String);
 
+// Implementations
 impl SubscriberName {
     pub fn parse(s: String) -> Result<Self, String> {
         let is_empty_or_whitespace = s.trim().is_empty();
@@ -23,6 +25,7 @@ impl AsRef<str> for SubscriberName {
     }
 }
 
+// Tests
 #[cfg(test)]
 mod tests {
     use crate::domain::SubscriberName;

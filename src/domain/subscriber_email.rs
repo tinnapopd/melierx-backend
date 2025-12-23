@@ -1,14 +1,17 @@
 use validator::Validate;
 
+// Public Types
 #[derive(Debug)]
 pub struct SubscriberEmail(String);
 
+// Private Types
 #[derive(Validate)]
 struct EmailWrapper {
     #[validate(email)]
     email: String,
 }
 
+// Implementations
 impl SubscriberEmail {
     pub fn parse(s: String) -> Result<Self, String> {
         let validator = EmailWrapper { email: s.clone() };
@@ -26,6 +29,7 @@ impl AsRef<str> for SubscriberEmail {
     }
 }
 
+// Tests
 #[cfg(test)]
 mod tests {
     use super::SubscriberEmail;

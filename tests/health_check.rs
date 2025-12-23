@@ -1,11 +1,20 @@
+use std::net::TcpListener;
+
+use once_cell::sync::Lazy;
+use sqlx::{Connection, Executor, PgConnection, PgPool};
+use uuid::Uuid;
+
 use melierx_backend::configuration::{DatabaseSettings, get_configuration};
 use melierx_backend::startup::run;
 use melierx_backend::telemetry::{get_subscriber, init_subscriber};
-use once_cell::sync::Lazy;
-use sqlx::{Connection, Executor, PgConnection, PgPool};
-use std::net::TcpListener;
-use uuid::Uuid;
 
+// Public Types
+pub struct TestApp {
+    pub address: String,
+    pub db_pool: PgPool,
+}
+
+// Private Types
 // Ensure that the `tracing` stack is only initialized once using `once_cell`
 static TRACING: Lazy<()> = Lazy::new(|| {
     let default_filter_level = "info".to_string();
@@ -19,32 +28,7 @@ static TRACING: Lazy<()> = Lazy::new(|| {
     };
 });
 
-pub struct TestApp {
-    pub address: String,
-    pub db_pool: PgPool,
-}
-
-async fn spawn_app() -> TestApp {
-    // The first time `initialize` is invoked the code in `TRACING` is executed.
-    // All other invocations will skip execution.
-    Lazy::force(&TRACING);
-
-    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
-    let port = listener.local_addr().unwrap().port();
-    let address = format!("http://127.0.0.1:{}", port);
-
-    let mut configuration = get_configuration().expect("Failed to read configuration.");
-    configuration.database.database_name = Uuid::new_v4().to_string();
-    let connection_pool = configure_database(&configuration.database).await;
-
-    let server = run(listener, connection_pool.clone()).expect("Failed to bind address");
-    let _ = actix_web::rt::spawn(server);
-    TestApp {
-        address,
-        db_pool: connection_pool,
-    }
-}
-
+// Public Functions
 pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
     // Create database
     let mut connection = PgConnection::connect_with(&config.without_db())
@@ -67,6 +51,29 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
     connection_pool
 }
 
+// Private Functions
+async fn spawn_app() -> TestApp {
+    // The first time `initialize` is invoked the code in `TRACING` is executed.
+    // All other invocations will skip execution.
+    Lazy::force(&TRACING);
+
+    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
+    let port = listener.local_addr().unwrap().port();
+    let address = format!("http://127.0.0.1:{}", port);
+
+    let mut configuration = get_configuration().expect("Failed to read configuration.");
+    configuration.database.database_name = Uuid::new_v4().to_string();
+    let connection_pool = configure_database(&configuration.database).await;
+
+    let server = run(listener, connection_pool.clone()).expect("Failed to bind address");
+    let _ = actix_web::rt::spawn(server);
+    TestApp {
+        address,
+        db_pool: connection_pool,
+    }
+}
+
+// Tests
 #[actix_web::test]
 async fn health_check_works() {
     // Arrange
