@@ -1,13 +1,12 @@
-use std::net::TcpListener;
-
 use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 
 use melierx_backend::configuration::{DatabaseSettings, get_configuration};
-use melierx_backend::email_client::EmailClient;
-use melierx_backend::startup::run;
+// use melierx_backend::email_client::EmailClient;
+use melierx_backend::startup::{Application, get_connection_pool};
 use melierx_backend::telemetry::{get_subscriber, init_subscriber};
+use wiremock::MockServer;
 
 // Public Structs
 pub struct TestApp {
@@ -29,44 +28,52 @@ static TRACING: Lazy<()> = Lazy::new(|| {
     };
 });
 
+// Implementations
+impl TestApp {
+    pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
+        reqwest::Client::new()
+            .post(&format!("{}/subscriptions", &self.address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+}
+
 // Public Functions
+/// Spawns the application and returns its address and database connection pool
 pub async fn spawn_app() -> TestApp {
-    // The first time `initialize` is invoked the code in `TRACING` is executed.
-    // All other invocations will skip execution.
     Lazy::force(&TRACING);
 
-    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
-    let port = listener.local_addr().unwrap().port();
-    let address = format!("http://127.0.0.1:{}", port);
+    // Launch a mock email server
+    let email_server = MockServer::start().await;
 
-    let mut configuration = get_configuration().expect("Failed to read configuration.");
-    configuration.database.database_name = Uuid::new_v4().to_string();
-    let connection_pool = configure_database(&configuration.database).await;
-    let timeout = configuration.email_client.timeout();
+    // Randomize configuration to ensure test isolation
+    let configuration = {
+        let mut c = get_configuration().expect("Failed to read configuration.");
+        // Use a different database for each test case
+        c.database.database_name = Uuid::new_v4().to_string();
+        // Use random OS port
+        c.application.port = 0;
+        // Use the mock email server
+        c.email_client.base_url = email_server.uri();
+        c
+    };
 
-    // Build an `EmailClient` using the configuration values
-    let sender_email = configuration
-        .email_client
-        .sender()
-        .expect("Invalid sender email address.");
-    let base_url = configuration
-        .email_client
-        .base_url
-        .parse()
-        .expect("Invalid base_url");
-    let email_client = EmailClient::new(
-        base_url,
-        sender_email,
-        configuration.email_client.authorization_token,
-        timeout,
-    );
+    // Create and migrate the database
+    configure_database(&configuration.database).await;
 
-    let server =
-        run(listener, connection_pool.clone(), email_client).expect("Failed to bind address");
-    let _ = actix_web::rt::spawn(server);
+    // Launch the application as a background task
+    let application = Application::build(configuration.clone())
+        .await
+        .expect("Failed to build application.");
+    let application_port = application.port();
+    let address = format!("http://127.0.0.1:{}", application_port);
+    let _ = actix_web::rt::spawn(application.run_until_stopped());
     TestApp {
         address,
-        db_pool: connection_pool,
+        db_pool: get_connection_pool(&configuration.database),
     }
 }
 
