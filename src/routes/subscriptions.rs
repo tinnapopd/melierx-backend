@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
 
-// Public Types
+// Public Structs
 /// Form data structure for new subscriber
 #[derive(serde::Deserialize)]
 pub struct FormData {

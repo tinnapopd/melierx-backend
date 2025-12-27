@@ -1,10 +1,10 @@
 use validator::Validate;
 
-// Public Types
+// Public Structs
 #[derive(Debug, Clone)]
 pub struct SubscriberEmail(String);
 
-// Private Types
+// Private Structs
 #[derive(Validate)]
 struct EmailWrapper {
     #[validate(email)]

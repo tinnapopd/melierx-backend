@@ -6,7 +6,7 @@ use sqlx::postgres::PgSslMode;
 
 use crate::domain::SubscriberEmail;
 
-// Public Types
+// Public Structs
 pub enum Environment {
     Local,
     Production,

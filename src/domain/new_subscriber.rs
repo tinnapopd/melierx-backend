@@ -1,7 +1,7 @@
 use crate::domain::SubscriberEmail;
 use crate::domain::SubscriberName;
 
-// Public Types
+// Public Structs
 pub struct NewSubscriber {
     pub email: SubscriberEmail,
     pub name: SubscriberName,
