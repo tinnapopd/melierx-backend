@@ -2,3 +2,7 @@ application:
   host: 0.0.0.0
 database:
   require_ssl: true
+email_client:
+  base_url: "https://app.postmarkapp.com"
+  sender_email: "noreply@melierx.com"
+  timeout_milliseconds: 5000

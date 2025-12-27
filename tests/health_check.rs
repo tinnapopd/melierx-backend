@@ -5,6 +5,7 @@ use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 
 use melierx_backend::configuration::{DatabaseSettings, get_configuration};
+use melierx_backend::email_client::EmailClient;
 use melierx_backend::startup::run;
 use melierx_backend::telemetry::{get_subscriber, init_subscriber};
 
@@ -64,8 +65,27 @@ async fn spawn_app() -> TestApp {
     let mut configuration = get_configuration().expect("Failed to read configuration.");
     configuration.database.database_name = Uuid::new_v4().to_string();
     let connection_pool = configure_database(&configuration.database).await;
+    let timeout = configuration.email_client.timeout();
 
-    let server = run(listener, connection_pool.clone()).expect("Failed to bind address");
+    // Build an `EmailClient` using the configuration values
+    let sender_email = configuration
+        .email_client
+        .sender()
+        .expect("Invalid sender email address.");
+    let base_url = configuration
+        .email_client
+        .base_url
+        .parse()
+        .expect("Invalid base_url");
+    let email_client = EmailClient::new(
+        base_url,
+        sender_email,
+        configuration.email_client.authorization_token,
+        timeout,
+    );
+
+    let server =
+        run(listener, connection_pool.clone(), email_client).expect("Failed to bind address");
     let _ = actix_web::rt::spawn(server);
     TestApp {
         address,

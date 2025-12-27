@@ -4,9 +4,14 @@ use sqlx::PgPool;
 use std::net::TcpListener;
 use tracing_actix_web::TracingLogger;
 
+use crate::email_client::EmailClient;
 use crate::routes::{health_check, subscribe};
 
-pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server, std::io::Error> {
+pub fn run(
+    listener: TcpListener,
+    db_pool: PgPool,
+    email_client: EmailClient,
+) -> Result<Server, std::io::Error> {
     // Wrap the connection in a smart pointer for shared ownership
     let db_pool = web::Data::new(db_pool);
     // Capture `connection` from the surrounding environment
@@ -18,6 +23,7 @@ pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server, std::io::Er
             .route("/subscriptions", web::post().to(subscribe))
             // Get a pointer copy and attach it to the application state
             .app_data(db_pool.clone())
+            .app_data(email_client.clone())
     })
     .listen(listener)?
     .run();

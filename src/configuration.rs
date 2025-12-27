@@ -4,6 +4,8 @@ use sqlx::ConnectOptions;
 use sqlx::postgres::PgConnectOptions;
 use sqlx::postgres::PgSslMode;
 
+use crate::domain::SubscriberEmail;
+
 // Public Types
 pub enum Environment {
     Local,
@@ -27,10 +29,20 @@ pub struct DatabaseSettings {
     pub password: SecretString,
     pub require_ssl: bool,
 }
+
+#[derive(serde::Deserialize)]
+pub struct EmailClientSettings {
+    pub base_url: String,
+    pub sender_email: String,
+    pub authorization_token: SecretString,
+    pub timeout_milliseconds: u64,
+}
+
 #[derive(serde::Deserialize)]
 pub struct Settings {
     pub database: DatabaseSettings,
     pub application: ApplicationSettings,
+    pub email_client: EmailClientSettings,
 }
 
 // Implementations
@@ -78,6 +90,16 @@ impl DatabaseSettings {
             .username(&self.username)
             .password(self.password.expose_secret())
             .ssl_mode(ssl_mode)
+    }
+}
+
+impl EmailClientSettings {
+    pub fn sender(&self) -> Result<SubscriberEmail, String> {
+        SubscriberEmail::parse(self.sender_email.clone())
+    }
+
+    pub fn timeout(&self) -> std::time::Duration {
+        std::time::Duration::from_millis(self.timeout_milliseconds)
     }
 }
 

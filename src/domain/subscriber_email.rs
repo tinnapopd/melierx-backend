@@ -1,7 +1,7 @@
 use validator::Validate;
 
 // Public Types
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SubscriberEmail(String);
 
 // Private Types

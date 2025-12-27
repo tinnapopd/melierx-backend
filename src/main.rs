@@ -2,6 +2,7 @@ use sqlx::postgres::PgPoolOptions;
 use std::net::TcpListener;
 
 use melierx_backend::configuration::get_configuration;
+use melierx_backend::email_client::EmailClient;
 use melierx_backend::startup::run;
 use melierx_backend::telemetry::{get_subscriber, init_subscriber};
 
@@ -17,11 +18,30 @@ async fn main() -> std::io::Result<()> {
     let connection_pool = PgPoolOptions::new()
         .acquire_timeout(std::time::Duration::from_secs(2))
         .connect_lazy_with(configuration.database.with_db());
+    let timeout = configuration.email_client.timeout();
+
+    // Build an `EmailClient` using the configuration values
+    let sender_email = configuration
+        .email_client
+        .sender()
+        .expect("Invalid sender email address.");
+    let base_url = configuration
+        .email_client
+        .base_url
+        .parse()
+        .expect("Invalid email client base URL");
+    let email_client = EmailClient::new(
+        base_url,
+        sender_email,
+        configuration.email_client.authorization_token,
+        timeout,
+    );
+
     let address = format!(
         "{}:{}",
         configuration.application.host, configuration.application.port
     );
     let listener = TcpListener::bind(address)?;
-    run(listener, connection_pool)?.await?;
+    run(listener, connection_pool, email_client)?.await?;
     Ok(())
 }
