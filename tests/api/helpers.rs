@@ -12,6 +12,7 @@ use wiremock::MockServer;
 pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
+    pub email_server: MockServer,
 }
 
 // Private Structs
@@ -74,6 +75,7 @@ pub async fn spawn_app() -> TestApp {
     TestApp {
         address,
         db_pool: get_connection_pool(&configuration.database),
+        email_server,
     }
 }
 
