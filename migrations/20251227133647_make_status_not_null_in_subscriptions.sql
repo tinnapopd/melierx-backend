@@ -1,3 +1,4 @@
+-- Migration to make `status` column NOT NULL in `subscriptions` table
 BEGIN;
     -- Backfill `status` for historical records
     UPDATE subscriptions
