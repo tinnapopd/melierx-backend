@@ -4,8 +4,13 @@ use tracing_log::LogTracer;
 use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt};
 
-// Public Functions
-/// Compose multiple layers into a single subscriber
+/// Compose a tracing subscriber
+/// # Arguments
+/// * `name` - The name of the application
+/// * `env_filter` - The environment filter string
+/// * `sink` - The sink to write logs to
+/// # Returns
+/// A tracing subscriber instance
 pub fn get_subscriber(
     name: String,
     env_filter: String,
@@ -23,8 +28,10 @@ pub fn get_subscriber(
         .with(formatting_layer)
 }
 
-/// Register a subscriber as global default to process span data
-/// It should only be called once!
+/// Initialize the tracing subscriber as global default
+/// # Arguments
+/// * `subscriber` - The tracing subscriber to set as global default
+/// Returns nothing
 pub fn init_subscriber(subscriber: impl tracing::Subscriber + Send + Sync) {
     LogTracer::init().expect("Failed to set logger.");
     set_global_default(subscriber).expect("Failed to set subscriber.");

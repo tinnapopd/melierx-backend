@@ -1,15 +1,17 @@
+use std::io;
+use std::net::TcpListener;
+use std::time::Duration;
+
 use actix_web::dev::Server;
 use actix_web::{App, HttpServer, web};
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
-use std::net::TcpListener;
 use tracing_actix_web::TracingLogger;
 
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::routes::{confirm, health_check, subscribe};
 
-// Public Structs
 pub struct Application {
     pub port: u16,
     pub server: Server,
@@ -17,10 +19,8 @@ pub struct Application {
 
 pub struct ApplicationBaseUrl(pub String);
 
-// Implementations
 impl Application {
-    /// Build and return a new instance of `Application`.
-    pub async fn build(configuration: Settings) -> Result<Self, std::io::Error> {
+    pub async fn build(configuration: Settings) -> Result<Self, io::Error> {
         let connection_pool = get_connection_pool(&configuration.database);
         let sender_email = configuration
             .email_client
@@ -61,19 +61,23 @@ impl Application {
     }
 
     /// Run the application until stopped.
-    pub async fn run_until_stopped(self) -> Result<(), std::io::Error> {
+    pub async fn run_until_stopped(self) -> Result<(), io::Error> {
         self.server.await
     }
 }
 
-// Public Functions
+/// Get a connection pool to the database.
+/// # Arguments
+/// * `configuration` - A reference to the database settings.
+/// # Returns
+/// A `PgPool` instance.
 pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
     PgPoolOptions::new()
-        .acquire_timeout(std::time::Duration::from_secs(2))
+        .acquire_timeout(Duration::from_secs(2))
         .connect_lazy_with(configuration.with_db())
 }
 
-pub async fn build(configuration: &Settings) -> Result<Server, std::io::Error> {
+pub async fn build(configuration: &Settings) -> Result<Server, io::Error> {
     let connection_pool = get_connection_pool(&configuration.database);
     let sender_email = configuration
         .email_client
@@ -110,7 +114,7 @@ pub fn run(
     db_pool: PgPool,
     email_client: EmailClient,
     base_url: String,
-) -> Result<Server, std::io::Error> {
+) -> Result<Server, io::Error> {
     let db_pool = web::Data::new(db_pool);
     let email_client = web::Data::new(email_client);
     let base_url = web::Data::new(ApplicationBaseUrl(base_url));

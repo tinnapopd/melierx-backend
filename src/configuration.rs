@@ -1,3 +1,6 @@
+use std::env;
+use std::time::Duration;
+
 use secrecy::{ExposeSecret, SecretString};
 use serde_aux::field_attributes::deserialize_number_from_string;
 use sqlx::ConnectOptions;
@@ -6,7 +9,6 @@ use sqlx::postgres::PgSslMode;
 
 use crate::domain::SubscriberEmail;
 
-// Public Structs
 #[derive(Clone)]
 pub enum Environment {
     Local,
@@ -47,7 +49,6 @@ pub struct Settings {
     pub email_client: EmailClientSettings,
 }
 
-// Implementations
 impl Environment {
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -100,18 +101,20 @@ impl EmailClientSettings {
         SubscriberEmail::parse(self.sender_email.clone())
     }
 
-    pub fn timeout(&self) -> std::time::Duration {
-        std::time::Duration::from_millis(self.timeout_milliseconds)
+    pub fn timeout(&self) -> Duration {
+        Duration::from_millis(self.timeout_milliseconds)
     }
 }
 
-// Public Functions
+/// Load the configuration settings from files and environment variables
+/// # Returns
+/// A Result containing the Settings struct or a ConfigError
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
-    let base_path = std::env::current_dir().expect("Failed to determine the current directory");
+    let base_path = env::current_dir().expect("Failed to determine the current directory");
     let configuration_directory = base_path.join("configuration");
 
     // Detect the running environment, default to 'local'
-    let environment: Environment = std::env::var("APP_ENVIRONMENT")
+    let environment: Environment = env::var("APP_ENVIRONMENT")
         .unwrap_or_else(|_| "local".into())
         .try_into()
         .expect("Failed to parse APP_ENVIRONMENT.");

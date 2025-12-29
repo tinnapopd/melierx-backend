@@ -1,10 +1,8 @@
 use unicode_segmentation::UnicodeSegmentation;
 
-// Public Structs
 #[derive(Debug)]
 pub struct SubscriberName(String);
 
-// Implementations
 impl SubscriberName {
     pub fn parse(s: String) -> Result<Self, String> {
         let is_empty_or_whitespace = s.trim().is_empty();

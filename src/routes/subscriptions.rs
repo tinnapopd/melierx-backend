@@ -1,3 +1,5 @@
+use std::iter::repeat_with;
+
 use actix_web::{HttpResponse, web};
 use chrono::Utc;
 use rand::{Rng, distr::Alphanumeric};
@@ -9,15 +11,12 @@ use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
 use crate::email_client::EmailClient;
 use crate::startup::ApplicationBaseUrl;
 
-// Public Structs
-/// Form data structure for new subscriber
 #[derive(serde::Deserialize)]
 pub struct FormData {
     email: String,
     name: String,
 }
 
-// Implementations
 impl TryFrom<FormData> for NewSubscriber {
     type Error = String;
 
@@ -28,8 +27,11 @@ impl TryFrom<FormData> for NewSubscriber {
     }
 }
 
-// Public Functions
-/// Returns `true` if the provided name is valid, `false` otherwise.
+/// Validates if the provided name is valid according to the business rules.
+/// # Arguments
+/// * `s` - The subscriber name string to validate.
+/// # Returns
+/// A boolean indicating whether the name is valid.
 pub fn is_valid_name(s: &str) -> bool {
     let is_empty_or_whitespace = s.trim().is_empty();
     let is_too_long = s.graphemes(true).count() > 256;
@@ -38,7 +40,12 @@ pub fn is_valid_name(s: &str) -> bool {
     !(is_empty_or_whitespace || is_too_long || contains_forbidden_characters)
 }
 
-/// Inserts a new subscriber into the database.
+/// Saves the new subscriber details in the database.
+/// # Arguments
+/// * `transaction` - A mutable reference to the database transaction.
+/// * `new_subscriber` - A reference to the NewSubscriber struct containing subscriber details.
+/// # Returns
+/// The UUID of the newly created subscriber.
 #[tracing::instrument(
     name = "Saving new subscriber details in the database",
     skip(transaction, new_subscriber)
@@ -68,6 +75,13 @@ pub async fn insert_subscriber(
 }
 
 /// Sends a confirmation email to the new subscriber.
+/// # Arguments
+/// * `email_client` - A reference to the EmailClient for sending emails.
+/// * `new_subscriber` - A reference to the NewSubscriber struct containing subscriber details.
+/// * `base_url` - The base URL of the application for constructing the confirmation link.
+/// * `subscription_token` - The subscription token to include in the confirmation link.
+/// # Returns
+/// A Result indicating success or failure of the email sending operation.
 #[tracing::instrument(
     name = "Send a confirmation email to a new subscriber",
     skip(email_client, new_subscriber, base_url, subscription_token)
@@ -96,6 +110,13 @@ pub async fn send_confirmation_email(
         .await
 }
 
+/// Stores the subscription token in the database associated with the subscriber ID.
+/// # Arguments
+/// * `transaction` - A mutable reference to the database transaction.
+/// * `subscriber_id` - The UUID of the subscriber.
+/// * `subscription_token` - The subscription token string to store.
+/// # Returns
+/// A Result indicating success or failure of the operation.
 #[tracing::instrument(
     name = "Store subscription token in the database",
     skip(transaction, subscription_token)
@@ -122,7 +143,14 @@ pub async fn store_token(
     Ok(())
 }
 
-/// Handles subscription requests.
+/// Handles the subscription of a new user.
+/// # Arguments
+/// * `form` - The form data containing subscriber details.
+/// * `pool` - A reference to the PostgreSQL connection pool.
+/// * `email_client` - A reference to the EmailClient for sending emails.
+/// * `base_url` - The base URL of the application for constructing confirmation links.
+/// # Returns
+/// An HTTP response indicating the result of the subscription process.
 #[tracing::instrument(
     name = "Adding a new subscriber",
     skip(form, pool, email_client, base_url),
@@ -181,7 +209,7 @@ pub async fn subscribe(
 fn generate_subscription_token() -> String {
     let mut rng = rand::rng();
 
-    std::iter::repeat_with(|| rng.sample(Alphanumeric))
+    repeat_with(|| rng.sample(Alphanumeric))
         .take(25)
         .map(char::from)
         .collect()

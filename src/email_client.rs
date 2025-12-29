@@ -1,8 +1,9 @@
+use std::time::Duration;
+
 use crate::domain::SubscriberEmail;
 use reqwest::{Client, Url};
 use secrecy::{ExposeSecret, SecretString};
 
-// Public Structs
 #[derive(Clone)]
 pub struct EmailClient {
     http_client: Client,
@@ -13,7 +14,6 @@ pub struct EmailClient {
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "PascalCase")]
-// Lifetime parameter always start with a apostrophe `'`
 pub struct SendEmailRequest<'a> {
     from: &'a str,
     pub to: &'a str,
@@ -28,7 +28,7 @@ impl EmailClient {
         base_url: Url,
         sender: SubscriberEmail,
         authorization_token: SecretString,
-        timeout: std::time::Duration,
+        timeout: Duration,
     ) -> Self {
         let http_client = Client::builder().timeout(timeout).build().unwrap();
 
