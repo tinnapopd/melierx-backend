@@ -3,7 +3,6 @@ use wiremock::{Mock, ResponseTemplate};
 
 use crate::helpers::spawn_app;
 
-// Tests
 #[actix_web::test]
 async fn subscribe_returns_a_200_for_valid_form_data() {
     // Arrange

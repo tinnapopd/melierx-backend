@@ -1,11 +1,12 @@
+use reqwest::Client;
+
 use crate::helpers::spawn_app;
 
-// Tests
 #[actix_web::test]
 async fn health_check_works() {
     // Arrange
     let app = spawn_app().await;
-    let client = reqwest::Client::new();
+    let client = Client::new();
 
     // Act
     let response = client
