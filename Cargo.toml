@@ -13,6 +13,7 @@ name = "melierx-backend"
 
 [dependencies]
 actix-web = "4"
+anyhow = "1.0.100"
 chrono = "0.4.42"
 claim = "0.5.0"
 config = "0.15.19"
@@ -27,6 +28,7 @@ secrecy = { version = "0.10.3", features = ["serde"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde-aux = "4.7.0"
 serde_json = "1.0.147"
+thiserror = "2.0.17"
 tracing = { version = "0.1.44", features = ["log"] }
 tracing-actix-web = "0.7.20"
 tracing-bunyan-formatter = "0.3.10"
