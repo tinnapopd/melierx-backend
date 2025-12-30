@@ -238,7 +238,7 @@ fn generate_subscription_token() -> String {
 /// * `f` - A mutable reference to the formatter.
 /// # Returns
 /// A fmt::Result indicating success or failure of the formatting operation.
-fn error_chain_fmt(e: &impl error::Error, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+pub fn error_chain_fmt(e: &impl error::Error, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}\n", e)?;
     let mut current = e.source();
     while let Some(cause) = current {
