@@ -12,29 +12,13 @@ use melierx_backend::configuration::{DatabaseSettings, get_configuration};
 use melierx_backend::startup::{Application, get_connection_pool};
 use melierx_backend::telemetry::{get_subscriber, init_subscriber};
 
+// Structure representing the test application.
 pub struct TestApp {
     pub address: String,
     pub port: u16,
     pub db_pool: PgPool,
     pub email_server: MockServer,
 }
-
-pub struct ConfirmationLinks {
-    pub html: Url,
-    pub plain_text: Url,
-}
-
-static TRACING: Lazy<()> = Lazy::new(|| {
-    let default_filter_level = "info".to_string();
-    let subscriber_name = "test".to_string();
-    if env::var("TEST_LOG").is_ok() {
-        let subscriber = get_subscriber(subscriber_name, default_filter_level, io::stdout);
-        init_subscriber(subscriber);
-    } else {
-        let subscriber = get_subscriber(subscriber_name, default_filter_level, io::sink);
-        init_subscriber(subscriber);
-    };
-});
 
 impl TestApp {
     /// Send a POST request to the subscriptions endpoint
@@ -69,32 +53,24 @@ impl TestApp {
     }
 }
 
-/// Configures the database by creating it and running migrations.
-/// # Arguments
-/// * `config` - A reference to the `DatabaseSettings` containing the database configuration.
-/// # Returns
-/// A `PgPool` instance connected to the configured database.
-pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
-    // Create database
-    let mut connection = PgConnection::connect_with(&config.without_db())
-        .await
-        .expect("Failed to connect to Postgres");
-    connection
-        .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
-        .await
-        .expect("Failed to create database.");
-
-    // Migrate database
-    let connection_pool = PgPool::connect_with(config.with_db())
-        .await
-        .expect("Failed to connect to Postgres.");
-    sqlx::migrate!("./migrations")
-        .run(&connection_pool)
-        .await
-        .expect("Failed to migrate the database");
-
-    connection_pool
+// Structure representing confirmation links extracted from an email.
+pub struct ConfirmationLinks {
+    pub html: Url,
+    pub plain_text: Url,
 }
+
+// Initialize tracing for tests
+static TRACING: Lazy<()> = Lazy::new(|| {
+    let default_filter_level = "info".to_string();
+    let subscriber_name = "test".to_string();
+    if env::var("TEST_LOG").is_ok() {
+        let subscriber = get_subscriber(subscriber_name, default_filter_level, io::stdout);
+        init_subscriber(subscriber);
+    } else {
+        let subscriber = get_subscriber(subscriber_name, default_filter_level, io::sink);
+        init_subscriber(subscriber);
+    };
+});
 
 /// Spawns the application and returns its address and a database connection pool.
 /// # Returns
@@ -131,4 +107,31 @@ pub async fn spawn_app() -> TestApp {
         db_pool: get_connection_pool(&configuration.database),
         email_server,
     }
+}
+
+/// Configures the database by creating it and running migrations.
+/// # Arguments
+/// * `config` - A reference to the `DatabaseSettings` containing the database configuration.
+/// # Returns
+/// A `PgPool` instance connected to the configured database.
+pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
+    // Create database
+    let mut connection = PgConnection::connect_with(&config.without_db())
+        .await
+        .expect("Failed to connect to Postgres");
+    connection
+        .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
+        .await
+        .expect("Failed to create database.");
+
+    // Migrate database
+    let connection_pool = PgPool::connect_with(config.with_db())
+        .await
+        .expect("Failed to connect to Postgres.");
+    sqlx::migrate!("./migrations")
+        .run(&connection_pool)
+        .await
+        .expect("Failed to migrate the database");
+
+    connection_pool
 }

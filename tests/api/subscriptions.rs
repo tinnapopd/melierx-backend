@@ -140,3 +140,21 @@ async fn subscribe_sends_a_confirmation_email_with_a_link() {
     // Assert that the links are the same
     assert_eq!(confirmation_links.html, confirmation_links.plain_text);
 }
+
+#[actix_web::test]
+async fn subscribe_fails_if_there_is_a_fatal_database_error() {
+    // Arrange
+    let app = spawn_app().await;
+    let body = "name=Tee%20Tinnapop&email=tinnapopduangtha%40gmail.com";
+
+    sqlx::query!("ALTER TABLE subscription_tokens DROP COLUMN subscription_token;")
+        .execute(&app.db_pool)
+        .await
+        .unwrap();
+
+    // Act
+    let response = app.post_subscriptions(body.into()).await;
+
+    // Assert
+    assert_eq!(500, response.status().as_u16());
+}
