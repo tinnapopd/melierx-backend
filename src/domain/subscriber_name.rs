@@ -1,5 +1,6 @@
 use unicode_segmentation::UnicodeSegmentation;
 
+// SubscriberName newtype with validation
 #[derive(Debug)]
 pub struct SubscriberName(String);
 

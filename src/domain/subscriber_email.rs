@@ -1,13 +1,8 @@
 use validator::Validate;
 
+// Subscriber email newtype.
 #[derive(Debug, Clone)]
 pub struct SubscriberEmail(String);
-
-#[derive(Validate)]
-struct EmailWrapper {
-    #[validate(email)]
-    email: String,
-}
 
 impl SubscriberEmail {
     pub fn parse(s: String) -> Result<Self, String> {
@@ -24,6 +19,13 @@ impl AsRef<str> for SubscriberEmail {
     fn as_ref(&self) -> &str {
         &self.0
     }
+}
+
+// Wrapper struct for email validation.
+#[derive(Validate)]
+struct EmailWrapper {
+    #[validate(email)]
+    email: String,
 }
 
 #[cfg(test)]
