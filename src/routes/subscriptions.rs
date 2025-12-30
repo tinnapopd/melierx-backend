@@ -1,16 +1,20 @@
-use std::iter::repeat_with;
+use std::error;
+use std::fmt;
+use std::iter;
 
-use actix_web::{HttpResponse, web};
+use actix_web::{HttpResponse, ResponseError, http::StatusCode, web};
+use anyhow::Context;
 use chrono::Utc;
 use rand::{Rng, distr::Alphanumeric};
+use sqlx::Executor;
 use sqlx::{PgPool, Postgres, Transaction};
-use unicode_segmentation::UnicodeSegmentation;
 use uuid::Uuid;
 
 use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
 use crate::email_client::EmailClient;
 use crate::startup::ApplicationBaseUrl;
 
+/// Form data structure for new subscriber.
 #[derive(serde::Deserialize)]
 pub struct FormData {
     email: String,
@@ -27,17 +31,101 @@ impl TryFrom<FormData> for NewSubscriber {
     }
 }
 
-/// Validates if the provided name is valid according to the business rules.
+// Error type for subscription process.
+#[derive(thiserror::Error)]
+pub enum SubscribeError {
+    #[error("0")]
+    ValidationError(String),
+    #[error("transparent")]
+    UnexpectedError(#[from] anyhow::Error),
+}
+
+impl fmt::Debug for SubscribeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        error_chain_fmt(self, f)
+    }
+}
+
+impl ResponseError for SubscribeError {
+    fn status_code(&self) -> StatusCode {
+        match self {
+            SubscribeError::ValidationError(_) => StatusCode::BAD_REQUEST,
+            SubscribeError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
+// Error type for storing subscription token.
+pub struct StoreTokenError(sqlx::Error);
+
+impl error::Error for StoreTokenError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
+impl fmt::Debug for StoreTokenError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        error_chain_fmt(self, f)
+    }
+}
+
+impl fmt::Display for StoreTokenError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "A database error was encountered while trying to store a subscription token."
+        )
+    }
+}
+
+/// Handles the subscription of a new user.
 /// # Arguments
-/// * `s` - The subscriber name string to validate.
+/// * `form` - The form data containing subscriber details.
+/// * `pool` - A reference to the PostgreSQL connection pool.
+/// * `email_client` - A reference to the EmailClient for sending emails.
+/// * `base_url` - The base URL of the application for constructing confirmation links.
 /// # Returns
-/// A boolean indicating whether the name is valid.
-pub fn is_valid_name(s: &str) -> bool {
-    let is_empty_or_whitespace = s.trim().is_empty();
-    let is_too_long = s.graphemes(true).count() > 256;
-    let forbidden_characters = ['/', '(', ')', '"', '<', '>', '\\', '{', '}'];
-    let contains_forbidden_characters = s.chars().any(|g| forbidden_characters.contains(&g));
-    !(is_empty_or_whitespace || is_too_long || contains_forbidden_characters)
+/// An HTTP response indicating the result of the subscription process.
+#[tracing::instrument(
+    name = "Adding a new subscriber",
+    skip(form, pool, email_client, base_url),
+    fields(
+        subscriber_email = %form.email,
+        subscriber_name = %form.name
+    )
+)]
+pub async fn subscribe(
+    form: web::Form<FormData>,
+    pool: web::Data<PgPool>,
+    email_client: web::Data<EmailClient>,
+    base_url: web::Data<ApplicationBaseUrl>,
+) -> Result<HttpResponse, SubscribeError> {
+    let new_subscriber = form.0.try_into().map_err(SubscribeError::ValidationError)?;
+    let mut transaction = pool
+        .begin()
+        .await
+        .context("Failed to start a new database transaction")?;
+    let subscriber_id = insert_subscriber(&mut transaction, &new_subscriber)
+        .await
+        .context("Failed to insert new subscriber in the database")?;
+    let subscription_token = generate_subscription_token();
+    store_token(&mut transaction, subscriber_id, &subscription_token)
+        .await
+        .context("Failed to store subscription token in the database")?;
+    transaction
+        .commit()
+        .await
+        .context("Failed to commit SQL transaction.")?;
+    send_confirmation_email(
+        &email_client,
+        &new_subscriber,
+        &base_url.0,
+        &subscription_token,
+    )
+    .await
+    .context("Failed to send a confirmation email.")?;
+    Ok(HttpResponse::Ok().finish())
 }
 
 /// Saves the new subscriber details in the database.
@@ -55,7 +143,7 @@ pub async fn insert_subscriber(
     new_subscriber: &NewSubscriber,
 ) -> Result<Uuid, sqlx::Error> {
     let subscriber_id = Uuid::new_v4();
-    sqlx::query!(
+    let query = sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at, status)
         VALUES ($1, $2, $3, $4, 'pending_confirmation')
@@ -64,13 +152,8 @@ pub async fn insert_subscriber(
         new_subscriber.email.as_ref(),
         new_subscriber.name.as_ref(),
         Utc::now().naive_utc()
-    )
-    .execute(&mut **transaction)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
-        e
-    })?;
+    );
+    transaction.execute(query).await?;
     Ok(subscriber_id)
 }
 
@@ -125,92 +208,42 @@ pub async fn store_token(
     transaction: &mut Transaction<'_, Postgres>,
     subscriber_id: Uuid,
     subscription_token: &str,
-) -> Result<(), sqlx::Error> {
-    sqlx::query!(
+) -> Result<(), StoreTokenError> {
+    let query = sqlx::query!(
         r#"
         INSERT INTO subscription_tokens (subscription_token, subscriber_id)
         VALUES ($1, $2)
         "#,
         subscription_token,
         subscriber_id
-    )
-    .execute(&mut **transaction)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
-        e
-    })?;
+    );
+    transaction.execute(query).await.map_err(StoreTokenError)?;
     Ok(())
 }
 
-/// Handles the subscription of a new user.
-/// # Arguments
-/// * `form` - The form data containing subscriber details.
-/// * `pool` - A reference to the PostgreSQL connection pool.
-/// * `email_client` - A reference to the EmailClient for sending emails.
-/// * `base_url` - The base URL of the application for constructing confirmation links.
+/// Generates a random subscription token.
 /// # Returns
-/// An HTTP response indicating the result of the subscription process.
-#[tracing::instrument(
-    name = "Adding a new subscriber",
-    skip(form, pool, email_client, base_url),
-    fields(
-        subscriber_email = %form.email,
-        subscriber_name = %form.name
-    )
-)]
-pub async fn subscribe(
-    form: web::Form<FormData>,
-    pool: web::Data<PgPool>,
-    email_client: web::Data<EmailClient>,
-    base_url: web::Data<ApplicationBaseUrl>,
-) -> HttpResponse {
-    let new_subscriber = match form.0.try_into() {
-        Ok(subscriber) => subscriber,
-        Err(_) => return HttpResponse::BadRequest().finish(),
-    };
-    let mut transaction = match pool.begin().await {
-        Ok(tx) => tx,
-        Err(_) => return HttpResponse::InternalServerError().finish(),
-    };
-
-    let subscriber_id = match insert_subscriber(&mut transaction, &new_subscriber).await {
-        Ok(subscriber_id) => subscriber_id,
-        Err(_) => return HttpResponse::InternalServerError().finish(),
-    };
-
-    let subscription_token = generate_subscription_token();
-    if store_token(&mut transaction, subscriber_id, &subscription_token)
-        .await
-        .is_err()
-    {
-        return HttpResponse::InternalServerError().finish();
-    }
-
-    if send_confirmation_email(
-        &email_client,
-        &new_subscriber,
-        &base_url.0,
-        &subscription_token,
-    )
-    .await
-    .is_err()
-    {
-        return HttpResponse::InternalServerError().finish();
-    }
-
-    if transaction.commit().await.is_err() {
-        return HttpResponse::InternalServerError().finish();
-    }
-
-    HttpResponse::Ok().finish()
-}
-
+/// A randomly generated subscription token string.
 fn generate_subscription_token() -> String {
     let mut rng = rand::rng();
-
-    repeat_with(|| rng.sample(Alphanumeric))
+    iter::repeat_with(|| rng.sample(Alphanumeric))
         .take(25)
         .map(char::from)
         .collect()
+}
+
+/// Formats the error chain for debugging purposes.
+/// # Arguments
+/// * `e` - A reference to the error to format.
+/// * `f` - A mutable reference to the formatter.
+/// # Returns
+/// A fmt::Result indicating success or failure of the formatting operation.
+fn error_chain_fmt(e: &impl error::Error, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}\n", e)?;
+    let mut current = e.source();
+    while let Some(cause) = current {
+        write!(f, "Caused by:\n\t{}", cause)?;
+        current = cause.source();
+    }
+    Ok(())
 }
