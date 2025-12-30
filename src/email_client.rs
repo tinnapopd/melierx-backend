@@ -4,6 +4,7 @@ use crate::domain::SubscriberEmail;
 use reqwest::{Client, Url};
 use secrecy::{ExposeSecret, SecretString};
 
+// Email client structure.
 #[derive(Clone)]
 pub struct EmailClient {
     http_client: Client,
@@ -12,17 +13,6 @@ pub struct EmailClient {
     authorization_token: SecretString,
 }
 
-#[derive(serde::Serialize)]
-#[serde(rename_all = "PascalCase")]
-pub struct SendEmailRequest<'a> {
-    from: &'a str,
-    pub to: &'a str,
-    pub subject: &'a str,
-    pub html_body: &'a str,
-    pub text_body: &'a str,
-}
-
-// Implementations
 impl EmailClient {
     pub fn new(
         base_url: Url,
@@ -70,6 +60,17 @@ impl EmailClient {
     }
 }
 
+// Request body structure for sending emails.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct SendEmailRequest<'a> {
+    from: &'a str,
+    pub to: &'a str,
+    pub subject: &'a str,
+    pub html_body: &'a str,
+    pub text_body: &'a str,
+}
+
 // Tests
 #[cfg(test)]
 mod tests {
@@ -86,10 +87,8 @@ mod tests {
     use crate::domain::SubscriberEmail;
     use crate::email_client::EmailClient;
 
-    // Struct
     struct SendEmailBodyMatcher;
 
-    // Implementations
     impl wiremock::Match for SendEmailBodyMatcher {
         fn matches(&self, request: &Request) -> bool {
             let result = serde_json::from_slice::<serde_json::Value>(&request.body);
@@ -106,7 +105,6 @@ mod tests {
         }
     }
 
-    // Functions
     /// Generate a random email subject
     fn subject() -> String {
         Sentence(1..2).fake()

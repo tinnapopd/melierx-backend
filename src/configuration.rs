@@ -9,44 +9,11 @@ use sqlx::postgres::PgSslMode;
 
 use crate::domain::SubscriberEmail;
 
+// Environment enum to distinguish between local and production settings.
 #[derive(Clone)]
 pub enum Environment {
     Local,
     Production,
-}
-
-#[derive(serde::Deserialize, Clone)]
-pub struct ApplicationSettings {
-    pub host: String,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub port: u16,
-    pub base_url: String,
-}
-
-#[derive(serde::Deserialize, Clone)]
-pub struct DatabaseSettings {
-    pub host: String,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub port: u16,
-    pub database_name: String,
-    pub username: String,
-    pub password: SecretString,
-    pub require_ssl: bool,
-}
-
-#[derive(serde::Deserialize, Clone)]
-pub struct EmailClientSettings {
-    pub base_url: String,
-    pub sender_email: String,
-    pub authorization_token: SecretString,
-    pub timeout_milliseconds: u64,
-}
-
-#[derive(serde::Deserialize, Clone)]
-pub struct Settings {
-    pub database: DatabaseSettings,
-    pub application: ApplicationSettings,
-    pub email_client: EmailClientSettings,
 }
 
 impl Environment {
@@ -72,6 +39,26 @@ impl TryFrom<String> for Environment {
         }
     }
 }
+// Application settings structure.
+#[derive(serde::Deserialize, Clone)]
+pub struct ApplicationSettings {
+    pub host: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub port: u16,
+    pub base_url: String,
+}
+
+// Database settings structure.
+#[derive(serde::Deserialize, Clone)]
+pub struct DatabaseSettings {
+    pub host: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub port: u16,
+    pub database_name: String,
+    pub username: String,
+    pub password: SecretString,
+    pub require_ssl: bool,
+}
 
 impl DatabaseSettings {
     pub fn with_db(&self) -> PgConnectOptions {
@@ -96,6 +83,15 @@ impl DatabaseSettings {
     }
 }
 
+// Email client settings structure.
+#[derive(serde::Deserialize, Clone)]
+pub struct EmailClientSettings {
+    pub base_url: String,
+    pub sender_email: String,
+    pub authorization_token: SecretString,
+    pub timeout_milliseconds: u64,
+}
+
 impl EmailClientSettings {
     pub fn sender(&self) -> Result<SubscriberEmail, String> {
         SubscriberEmail::parse(self.sender_email.clone())
@@ -104,6 +100,14 @@ impl EmailClientSettings {
     pub fn timeout(&self) -> Duration {
         Duration::from_millis(self.timeout_milliseconds)
     }
+}
+
+// Facade settings structure.
+#[derive(serde::Deserialize, Clone)]
+pub struct Settings {
+    pub database: DatabaseSettings,
+    pub application: ApplicationSettings,
+    pub email_client: EmailClientSettings,
 }
 
 /// Load the configuration settings from files and environment variables

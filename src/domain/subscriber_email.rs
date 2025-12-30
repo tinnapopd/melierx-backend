@@ -59,6 +59,7 @@ mod tests {
         claim::assert_ok!(SubscriberEmail::parse(email));
     }
 
+    // Structure for generating valid email fixtures.
     #[derive(Debug, Clone)]
     struct ValidEmailFixture(pub String);
 

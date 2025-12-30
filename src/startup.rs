@@ -12,12 +12,11 @@ use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::routes::{confirm, health_check, subscribe};
 
+// Application struct representing the running application.
 pub struct Application {
     pub port: u16,
     pub server: Server,
 }
-
-pub struct ApplicationBaseUrl(pub String);
 
 impl Application {
     pub async fn build(configuration: Settings) -> Result<Self, io::Error> {
@@ -66,17 +65,14 @@ impl Application {
     }
 }
 
-/// Get a connection pool to the database.
-/// # Arguments
-/// * `configuration` - A reference to the database settings.
-/// # Returns
-/// A `PgPool` instance.
-pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
-    PgPoolOptions::new()
-        .acquire_timeout(Duration::from_secs(2))
-        .connect_lazy_with(configuration.with_db())
-}
+// Newtype for application base URL.
+pub struct ApplicationBaseUrl(pub String);
 
+/// Build and run the HTTP server.
+/// # Arguments
+/// * `configuration` - A reference to the application settings.
+/// # Returns
+/// A Result containing the Server or an io::Error.
 pub async fn build(configuration: &Settings) -> Result<Server, io::Error> {
     let connection_pool = get_connection_pool(&configuration.database);
     let sender_email = configuration
@@ -109,6 +105,14 @@ pub async fn build(configuration: &Settings) -> Result<Server, io::Error> {
     )
 }
 
+/// Run the HTTP server.
+/// # Arguments
+/// * `listener` - A TcpListener for incoming connections.
+/// * `db_pool` - A PgPool for database connections.
+/// * `email_client` - An EmailClient for sending emails.
+/// * `base_url` - The base URL of the application.
+/// # Returns
+/// A Result containing the Server or an io::Error.
 pub fn run(
     listener: TcpListener,
     db_pool: PgPool,
@@ -134,4 +138,15 @@ pub fn run(
     .run();
 
     Ok(server)
+}
+
+/// Get a connection pool to the database.
+/// # Arguments
+/// * `configuration` - A reference to the database settings.
+/// # Returns
+/// A `PgPool` instance.
+pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
+    PgPoolOptions::new()
+        .acquire_timeout(Duration::from_secs(2))
+        .connect_lazy_with(configuration.with_db())
 }
