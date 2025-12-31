@@ -2,7 +2,8 @@ use std::error;
 use std::fmt;
 use std::iter;
 
-use actix_web::{HttpResponse, ResponseError, http::StatusCode, web};
+use actix_web::http::StatusCode;
+use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
 use chrono::Utc;
 use rand::{Rng, distr::Alphanumeric};
@@ -34,9 +35,9 @@ impl TryFrom<FormData> for NewSubscriber {
 // Error type for subscription process.
 #[derive(thiserror::Error)]
 pub enum SubscribeError {
-    #[error("0")]
+    #[error("{0}")]
     ValidationError(String),
-    #[error("transparent")]
+    #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
 }
 
@@ -81,23 +82,23 @@ impl fmt::Display for StoreTokenError {
 
 /// Handles the subscription of a new user.
 /// # Arguments
-/// * `form` - The form data containing subscriber details.
 /// * `pool` - A reference to the PostgreSQL connection pool.
+/// * `form` - The form data containing subscriber details.
 /// * `email_client` - A reference to the EmailClient for sending emails.
 /// * `base_url` - The base URL of the application for constructing confirmation links.
 /// # Returns
 /// An HTTP response indicating the result of the subscription process.
 #[tracing::instrument(
     name = "Adding a new subscriber",
-    skip(form, pool, email_client, base_url),
+    skip(pool, form, email_client, base_url),
     fields(
         subscriber_email = %form.email,
         subscriber_name = %form.name
     )
 )]
 pub async fn subscribe(
-    form: web::Form<FormData>,
     pool: web::Data<PgPool>,
+    form: web::Form<FormData>,
     email_client: web::Data<EmailClient>,
     base_url: web::Data<ApplicationBaseUrl>,
 ) -> Result<HttpResponse, SubscribeError> {
