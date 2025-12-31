@@ -1,3 +1,4 @@
+use actix_web::rt::task::{JoinHandle, spawn_blocking};
 use tracing::subscriber::set_global_default;
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
@@ -35,4 +36,18 @@ pub fn get_subscriber(
 pub fn init_subscriber(subscriber: impl tracing::Subscriber + Send + Sync) {
     LogTracer::init().expect("Failed to set logger.");
     set_global_default(subscriber).expect("Failed to set subscriber.");
+}
+
+/// Spawns a blocking task with the current tracing span
+/// # Arguments
+/// * `f` - The blocking function to execute
+/// # Returns
+/// A JoinHandle to the spawned task
+pub fn spawn_blocking_with_tracing<F, R>(f: F) -> JoinHandle<R>
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
+{
+    let current_span = tracing::Span::current();
+    spawn_blocking(move || current_span.in_scope(f))
 }
