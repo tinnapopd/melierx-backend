@@ -1,6 +1,6 @@
 use std::fmt;
 
-use validator::Validate;
+use validator::ValidateEmail;
 
 // Subscriber email newtype.
 #[derive(Debug, Clone)]
@@ -8,18 +8,11 @@ pub struct SubscriberEmail(String);
 
 impl SubscriberEmail {
     pub fn parse(s: String) -> Result<Self, String> {
-        let validator = EmailWrapper { email: s.clone() };
-        if validator.validate().is_ok() {
+        if s.validate_email() {
             Ok(Self(s))
         } else {
             Err(format!("'{}' is not a valid subscriber email.", s))
         }
-    }
-}
-
-impl fmt::Display for SubscriberEmail {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
     }
 }
 
@@ -29,11 +22,10 @@ impl AsRef<str> for SubscriberEmail {
     }
 }
 
-// Wrapper struct for email validation.
-#[derive(Validate)]
-struct EmailWrapper {
-    #[validate(email)]
-    email: String,
+impl fmt::Display for SubscriberEmail {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
 }
 
 #[cfg(test)]
@@ -59,12 +51,6 @@ mod tests {
     fn email_missing_subject_is_rejected() {
         let email = "@domain.com".to_string();
         assert_err!(SubscriberEmail::parse(email));
-    }
-
-    #[test]
-    fn valid_emails_are_parsed_successfully() {
-        let email = SafeEmail().fake();
-        claim::assert_ok!(SubscriberEmail::parse(email));
     }
 
     // Structure for generating valid email fixtures.

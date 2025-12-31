@@ -5,7 +5,7 @@ use uuid::Uuid;
 // Query parameters structure for subscription confirmation.
 #[derive(serde::Deserialize)]
 pub struct Parameters {
-    pub subscription_token: String,
+    subscription_token: String,
 }
 
 /// Handles the confirmation of a pending subscription.

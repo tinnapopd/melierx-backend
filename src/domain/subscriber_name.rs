@@ -24,7 +24,6 @@ impl AsRef<str> for SubscriberName {
     }
 }
 
-// Tests
 #[cfg(test)]
 mod tests {
     use crate::domain::SubscriberName;
@@ -49,7 +48,7 @@ mod tests {
     }
 
     #[test]
-    fn empty_name_is_rejected() {
+    fn empty_string_is_rejected() {
         let name = "".to_string();
         assert_err!(SubscriberName::parse(name));
     }
