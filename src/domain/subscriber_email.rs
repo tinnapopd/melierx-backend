@@ -3,7 +3,7 @@ use std::fmt;
 use validator::ValidateEmail;
 
 // Subscriber email newtype.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SubscriberEmail(String);
 
 impl SubscriberEmail {
@@ -34,6 +34,8 @@ mod tests {
     use claim::assert_err;
     use fake::Fake;
     use fake::faker::internet::en::SafeEmail;
+    use rand::SeedableRng;
+    use rand::rngs::StdRng;
 
     #[test]
     fn empty_string_is_rejected() {
@@ -43,7 +45,7 @@ mod tests {
 
     #[test]
     fn email_missing_at_symbol_is_rejected() {
-        let email = "tinnapopduangthagmail.com".to_string();
+        let email = "mynickname.com".to_string();
         assert_err!(SubscriberEmail::parse(email));
     }
 
@@ -58,14 +60,17 @@ mod tests {
     struct ValidEmailFixture(pub String);
 
     impl quickcheck::Arbitrary for ValidEmailFixture {
-        fn arbitrary(_: &mut quickcheck::Gen) -> Self {
-            let email: String = SafeEmail().fake();
+        fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+            let mut rng = StdRng::seed_from_u64(u64::arbitrary(g));
+            let email: String = SafeEmail().fake_with_rng(&mut rng);
             Self(email)
         }
     }
 
     #[quickcheck_macros::quickcheck]
-    fn valid_emails_are_parsed_successfully_quickcheck(valid_email: ValidEmailFixture) -> bool {
+    fn valid_emails_are_parsed_successfully_quickcheck(
+        valid_email: ValidEmailFixture,
+    ) -> bool {
         SubscriberEmail::parse(valid_email.0).is_ok()
     }
 }
