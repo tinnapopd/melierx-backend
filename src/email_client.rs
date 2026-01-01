@@ -5,7 +5,6 @@ use reqwest::{Client, Url};
 use secrecy::{ExposeSecret, SecretString};
 
 // Email client structure.
-#[derive(Clone)]
 pub struct EmailClient {
     http_client: Client,
     base_url: Url,
@@ -21,7 +20,6 @@ impl EmailClient {
         timeout: Duration,
     ) -> Self {
         let http_client = Client::builder().timeout(timeout).build().unwrap();
-
         Self {
             http_client,
             base_url,
@@ -75,7 +73,6 @@ pub struct SendEmailRequest<'a> {
 #[cfg(test)]
 mod tests {
     use claim::{assert_err, assert_ok};
-
     use fake::faker::internet::en::SafeEmail;
     use fake::faker::lorem::en::{Paragraph, Sentence};
     use fake::{Fake, Faker};
@@ -91,9 +88,9 @@ mod tests {
 
     impl wiremock::Match for SendEmailBodyMatcher {
         fn matches(&self, request: &Request) -> bool {
-            let result = serde_json::from_slice::<serde_json::Value>(&request.body);
+            let result: Result<serde_json::Value, _> =
+                serde_json::from_slice(&request.body);
             if let Ok(body) = result {
-                dbg!(&body);
                 body.get("From").is_some()
                     && body.get("To").is_some()
                     && body.get("Subject").is_some()
@@ -122,7 +119,8 @@ mod tests {
 
     /// Get a test instance of EmailClient
     fn email_client(base_url: Url) -> EmailClient {
-        let authorization_token = SecretString::new(Faker.fake::<String>().into_boxed_str());
+        let authorization_token =
+            SecretString::new(Faker.fake::<String>().into_boxed_str());
         EmailClient::new(
             base_url,
             email(),
@@ -207,7 +205,8 @@ mod tests {
         let base_url = reqwest::Url::parse(&mock_server.uri()).unwrap();
         let email_client = email_client(base_url);
 
-        let response = ResponseTemplate::new(200).set_delay(std::time::Duration::from_secs(180));
+        let response = ResponseTemplate::new(200)
+            .set_delay(std::time::Duration::from_secs(180));
 
         Mock::given(any())
             .respond_with(response)
