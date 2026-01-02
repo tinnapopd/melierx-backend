@@ -1,16 +1,14 @@
+use std::convert::{TryFrom, TryInto};
 use std::env;
 use std::time::Duration;
 
 use secrecy::{ExposeSecret, SecretString};
 use serde_aux::field_attributes::deserialize_number_from_string;
-use sqlx::ConnectOptions;
-use sqlx::postgres::PgConnectOptions;
-use sqlx::postgres::PgSslMode;
+use sqlx::postgres::{PgConnectOptions, PgSslMode};
 
 use crate::domain::SubscriberEmail;
 
 // Environment enum to distinguish between local and production settings.
-#[derive(Clone)]
 pub enum Environment {
     Local,
     Production,
@@ -30,8 +28,8 @@ impl TryFrom<String> for Environment {
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
         match s.to_lowercase().as_str() {
-            "local" => Ok(Environment::Local),
-            "production" => Ok(Environment::Production),
+            "local" => Ok(Self::Local),
+            "production" => Ok(Self::Production),
             other => Err(format!(
                 "{} is not a supported environment. Use either 'local' or 'production'.",
                 other
@@ -39,6 +37,7 @@ impl TryFrom<String> for Environment {
         }
     }
 }
+
 // Application settings structure.
 #[derive(serde::Deserialize, Clone)]
 pub struct ApplicationSettings {
@@ -46,6 +45,7 @@ pub struct ApplicationSettings {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub base_url: String,
+    pub hmac_secret: SecretString,
 }
 
 // Database settings structure.
@@ -61,23 +61,18 @@ pub struct DatabaseSettings {
 }
 
 impl DatabaseSettings {
-    pub fn with_db(&self) -> PgConnectOptions {
-        self.without_db()
-            .database(&self.database_name)
-            .log_statements(tracing::log::LevelFilter::Trace)
-    }
-
-    pub fn without_db(&self) -> PgConnectOptions {
+    pub fn connect_options(&self) -> PgConnectOptions {
         let ssl_mode = if self.require_ssl {
             PgSslMode::Require
         } else {
-            // Try an encrypted connection, fall back to unencrypted if not available
             PgSslMode::Prefer
         };
+
         PgConnectOptions::new()
             .host(&self.host)
             .port(self.port)
             .username(&self.username)
+            .database(&self.database_name)
             .password(self.password.expose_secret())
             .ssl_mode(ssl_mode)
     }
@@ -89,6 +84,7 @@ pub struct EmailClientSettings {
     pub base_url: String,
     pub sender_email: String,
     pub authorization_token: SecretString,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub timeout_milliseconds: u64,
 }
 
@@ -114,7 +110,8 @@ pub struct Settings {
 /// # Returns
 /// A Result containing the Settings struct or a ConfigError
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
-    let base_path = env::current_dir().expect("Failed to determine the current directory");
+    let base_path =
+        env::current_dir().expect("Failed to determine the current directory");
     let configuration_directory = base_path.join("configuration");
 
     // Detect the running environment, default to 'local'
@@ -125,15 +122,21 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
 
     let settings = config::Config::builder()
         // Base config: configuration/base.*
-        .add_source(config::File::from(configuration_directory.join("base")).required(true))
+        .add_source(
+            config::File::from(configuration_directory.join("base"))
+                .required(true),
+        )
         // Env-specific override
         .add_source(
-            config::File::from(configuration_directory.join(environment.as_str())).required(true),
+            config::File::from(
+                configuration_directory.join(environment.as_str()),
+            )
+            .required(true),
         )
         .add_source(config::Environment::with_prefix("APP").separator("__"))
         // Add in settings from environment variables (with prefix APP and '__' as separator)
         // E.g., `APP_DATABASE__USERNAME` would set `database.username`
         .build()?;
 
-    settings.try_deserialize()
+    settings.try_deserialize::<Settings>()
 }

@@ -5,7 +5,7 @@ use wiremock::{Mock, ResponseTemplate};
 use crate::helpers::{ConfirmationLinks, TestApp, spawn_app};
 
 async fn create_unconfirmed_subscriber(app: &TestApp) -> ConfirmationLinks {
-    let body = "name=Tee%20Tinnapop&email=tinnapopduangtha%40gmail.com";
+    let body = "name=FistName%20LastName&email=mynickname%40gmail.com";
 
     let _mock_guard = Mock::given(path("/email"))
         .and(method("POST"))
@@ -20,7 +20,7 @@ async fn create_unconfirmed_subscriber(app: &TestApp) -> ConfirmationLinks {
         .error_for_status()
         .unwrap();
 
-    let email_request = app
+    let email_request = &app
         .email_server
         .received_requests()
         .await
@@ -28,12 +28,12 @@ async fn create_unconfirmed_subscriber(app: &TestApp) -> ConfirmationLinks {
         .pop()
         .unwrap();
 
-    app.get_confirmation_links(&email_request)
+    app.get_confirmation_links(email_request)
 }
 
 async fn create_confirmed_subscriber(app: &TestApp) {
-    let confirmation_links = create_unconfirmed_subscriber(app).await;
-    reqwest::get(confirmation_links.html)
+    let confirmation_links = create_unconfirmed_subscriber(app).await.html;
+    reqwest::get(confirmation_links)
         .await
         .unwrap()
         .error_for_status()
@@ -121,8 +121,8 @@ async fn newsletters_returns_400_for_invalid_data() {
 
         // Assert
         assert_eq!(
-            400,
             response.status().as_u16(),
+            400,
             "The API did not fail with 400 Bad Request when the payload was {}.",
             error_message
         );
@@ -149,7 +149,7 @@ async fn request_missing_authorization_is_rejected() {
         .expect("Failed to execute request.");
 
     // Assert
-    assert_eq!(401, response.status().as_u16());
+    assert_eq!(response.status().as_u16(), 401);
     assert_eq!(
         r#"Basic realm="publish""#,
         response.headers().get("WWW-Authenticate").unwrap()
@@ -160,13 +160,14 @@ async fn request_missing_authorization_is_rejected() {
 async fn non_existing_user_is_rejected() {
     // Arrange
     let app = spawn_app().await;
+
     let username = Uuid::new_v4().to_string();
     let password = Uuid::new_v4().to_string();
 
     // Act
     let response = reqwest::Client::new()
         .post(&format!("{}/newsletters", &app.address))
-        .basic_auth(&username, Some(&password))
+        .basic_auth(username, Some(password))
         .json(&serde_json::json!({
             "title": "Newsletter Title",
             "content": {
@@ -179,7 +180,7 @@ async fn non_existing_user_is_rejected() {
         .expect("Failed to execute request.");
 
     // Assert
-    assert_eq!(401, response.status().as_u16());
+    assert_eq!(response.status().as_u16(), 401);
     assert_eq!(
         r#"Basic realm="publish""#,
         response.headers().get("WWW-Authenticate").unwrap()
@@ -190,13 +191,15 @@ async fn non_existing_user_is_rejected() {
 async fn invalid_password_is_rejected() {
     // Arrange
     let app = spawn_app().await;
+
     let username = &app.test_user.username;
     let password = Uuid::new_v4().to_string();
+    assert_ne!(app.test_user.password, password);
 
     // Act
     let response = reqwest::Client::new()
         .post(&format!("{}/newsletters", &app.address))
-        .basic_auth(username, Some(&password))
+        .basic_auth(username, Some(password))
         .json(&serde_json::json!({
             "title": "Newsletter Title",
             "content": {
@@ -209,7 +212,7 @@ async fn invalid_password_is_rejected() {
         .expect("Failed to execute request.");
 
     // Assert
-    assert_eq!(401, response.status().as_u16());
+    assert_eq!(response.status().as_u16(), 401);
     assert_eq!(
         r#"Basic realm="publish""#,
         response.headers().get("WWW-Authenticate").unwrap()

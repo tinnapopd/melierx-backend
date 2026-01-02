@@ -1,6 +1,10 @@
-use actix_web::{HttpResponse, web};
+use actix_web::http::StatusCode;
+use actix_web::{HttpResponse, ResponseError, web};
+use anyhow::Context;
 use sqlx::PgPool;
 use uuid::Uuid;
+
+use crate::routes::error_chain_fmt;
 
 // Query parameters structure for subscription confirmation.
 #[derive(serde::Deserialize)]
@@ -8,27 +12,54 @@ pub struct Parameters {
     subscription_token: String,
 }
 
+// Error type for subscription confirmation failures.
+#[derive(thiserror::Error)]
+pub enum ConfirmationError {
+    #[error(transparent)]
+    UnexpectedError(#[from] anyhow::Error),
+    #[error("There is no subscriber associated with the provided token.")]
+    UnknownToken,
+}
+
+impl std::fmt::Debug for ConfirmationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        error_chain_fmt(self, f)
+    }
+}
+
+impl ResponseError for ConfirmationError {
+    fn status_code(&self) -> StatusCode {
+        match self {
+            Self::UnknownToken => StatusCode::UNAUTHORIZED,
+            Self::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
 /// Handles the confirmation of a pending subscription.
 /// # Arguments
 /// * `pool` - A reference to the PostgreSQL connection pool.
 /// * `parameters` - The query parameters containing the subscription token.
 /// # Returns
-/// An HTTP response indicating the result of the confirmation process.
-#[tracing::instrument(name = "Confirm a pending subscription", skip(pool, parameters))]
-pub async fn confirm(pool: web::Data<PgPool>, parameters: web::Query<Parameters>) -> HttpResponse {
-    let id = match get_subscriber_id_from_token(&pool, &parameters.subscription_token).await {
-        Ok(id) => id,
-        Err(_) => return HttpResponse::InternalServerError().finish(),
-    };
-    match id {
-        None => HttpResponse::Unauthorized().finish(),
-        Some(subscriber_id) => {
-            if confirm_subscriber(&pool, subscriber_id).await.is_err() {
-                return HttpResponse::InternalServerError().finish();
-            }
-            HttpResponse::Ok().finish()
-        }
-    }
+/// A Result indicating success or failure of the confirmation process.
+#[tracing::instrument(
+    name = "Confirm a pending subscription",
+    skip(pool, parameters)
+)]
+pub async fn confirm(
+    pool: web::Data<PgPool>,
+    parameters: web::Query<Parameters>,
+) -> Result<HttpResponse, ConfirmationError> {
+    let subscriber_id = get_subscriber_id_from_token(&pool, &parameters.subscription_token)
+        .await
+        .context("Failed to retrieve the subscriber id associated with the provided token.")?
+        .ok_or(ConfirmationError::UnknownToken)?;
+
+    confirm_subscriber(&pool, subscriber_id)
+        .await
+        .context("Failed to update the subscriber status to `confirmed`.")?;
+
+    Ok(HttpResponse::Ok().finish())
 }
 
 /// Retrieves the subscriber ID associated with the given subscription token.
@@ -37,7 +68,10 @@ pub async fn confirm(pool: web::Data<PgPool>, parameters: web::Query<Parameters>
 /// * `subscription_token` - The subscription token string.
 /// # Returns
 /// An Option containing the subscriber UUID if found, or None if not found.
-#[tracing::instrument(name = "Get subscriber_id from token", skip(subscription_token, pool))]
+#[tracing::instrument(
+    name = "Get subscriber_id from token",
+    skip(subscription_token, pool)
+)]
 pub async fn get_subscriber_id_from_token(
     pool: &PgPool,
     subscription_token: &str,
@@ -50,11 +84,7 @@ pub async fn get_subscriber_id_from_token(
         subscription_token
     )
     .fetch_optional(pool)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
-        e
-    })?;
+    .await?;
     Ok(result.map(|r| r.subscriber_id))
 }
 
@@ -64,8 +94,14 @@ pub async fn get_subscriber_id_from_token(
 /// * `subscriber_id` - The UUID of the subscriber to be confirmed.
 /// # Returns
 /// A Result indicating success or failure of the operation.
-#[tracing::instrument(name = "Marking subscription as confirmed", skip(subscriber_id, pool))]
-pub async fn confirm_subscriber(pool: &PgPool, subscriber_id: Uuid) -> Result<(), sqlx::Error> {
+#[tracing::instrument(
+    name = "Marking subscription as confirmed",
+    skip(subscriber_id, pool)
+)]
+pub async fn confirm_subscriber(
+    pool: &PgPool,
+    subscriber_id: Uuid,
+) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
         UPDATE subscriptions
@@ -75,10 +111,6 @@ pub async fn confirm_subscriber(pool: &PgPool, subscriber_id: Uuid) -> Result<()
         subscriber_id
     )
     .execute(pool)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
-        e
-    })?;
+    .await?;
     Ok(())
 }

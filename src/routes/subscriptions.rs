@@ -51,7 +51,9 @@ impl ResponseError for SubscribeError {
     fn status_code(&self) -> StatusCode {
         match self {
             SubscribeError::ValidationError(_) => StatusCode::BAD_REQUEST,
-            SubscribeError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            SubscribeError::UnexpectedError(_) => {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
         }
     }
 }
@@ -102,7 +104,8 @@ pub async fn subscribe(
     email_client: web::Data<EmailClient>,
     base_url: web::Data<ApplicationBaseUrl>,
 ) -> Result<HttpResponse, SubscribeError> {
-    let new_subscriber = form.0.try_into().map_err(SubscribeError::ValidationError)?;
+    let new_subscriber =
+        form.0.try_into().map_err(SubscribeError::ValidationError)?;
     let mut transaction = pool
         .begin()
         .await
@@ -120,7 +123,7 @@ pub async fn subscribe(
         .context("Failed to commit SQL transaction.")?;
     send_confirmation_email(
         &email_client,
-        &new_subscriber,
+        new_subscriber,
         &base_url.0,
         &subscription_token,
     )
@@ -172,7 +175,7 @@ pub async fn insert_subscriber(
 )]
 pub async fn send_confirmation_email(
     email_client: &EmailClient,
-    new_subscriber: &NewSubscriber,
+    new_subscriber: NewSubscriber,
     base_url: &str,
     subscription_token: &str,
 ) -> Result<(), reqwest::Error> {
@@ -239,7 +242,10 @@ fn generate_subscription_token() -> String {
 /// * `f` - A mutable reference to the formatter.
 /// # Returns
 /// A fmt::Result indicating success or failure of the formatting operation.
-pub fn error_chain_fmt(e: &impl error::Error, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+pub fn error_chain_fmt(
+    e: &impl error::Error,
+    f: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
     write!(f, "{}\n", e)?;
     let mut current = e.source();
     while let Some(cause) = current {
