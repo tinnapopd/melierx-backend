@@ -104,6 +104,7 @@ pub struct Settings {
     pub database: DatabaseSettings,
     pub application: ApplicationSettings,
     pub email_client: EmailClientSettings,
+    pub redis_uri: SecretString,
 }
 
 /// Load the configuration settings from files and environment variables
