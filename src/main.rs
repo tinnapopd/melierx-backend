@@ -5,7 +5,7 @@ use melierx_backend::startup::Application;
 use melierx_backend::telemetry::{get_subscriber, init_subscriber};
 
 #[actix_web::main]
-async fn main() -> io::Result<()> {
+async fn main() -> anyhow::Result<()> {
     let subscriber =
         get_subscriber("melierx_backend".into(), "info".into(), io::stdout);
     init_subscriber(subscriber);
