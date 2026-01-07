@@ -1,5 +1,3 @@
-use std::fmt;
-
 use actix_web::http::header::ContentType;
 use actix_web::http::header::LOCATION;
 use actix_web::{HttpResponse, web};
@@ -8,6 +6,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::session_state::TypedSession;
+use crate::utils::e500;
 
 pub async fn admin_dashboard(
     pool: web::Data<PgPool>,
@@ -31,6 +30,10 @@ pub async fn admin_dashboard(
         </head>
         <body>
             <h1>Welcome {username}!</h1>
+            <p>Available actions:</p>
+            <ol>
+                <li><a href="/admin/password">Change password</a></li>
+            </ol>
         </body>
         </html>
     "#
@@ -39,13 +42,6 @@ pub async fn admin_dashboard(
     Ok(HttpResponse::Ok()
         .content_type(ContentType::html())
         .body(html_content))
-}
-
-fn e500<T>(e: T) -> actix_web::Error
-where
-    T: fmt::Debug + fmt::Display + 'static,
-{
-    actix_web::error::ErrorInternalServerError(e)
 }
 
 #[tracing::instrument(name = "Get username from user_id", skip(pool))]
