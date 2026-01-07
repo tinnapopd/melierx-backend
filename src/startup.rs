@@ -16,6 +16,7 @@ use tracing_actix_web::TracingLogger;
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::routes::{admin_dashboard, publish_newsletter, subscribe};
+use crate::routes::{change_password, change_password_form};
 use crate::routes::{confirm, health_check, home, login, login_form};
 
 // Application struct representing the running application.
@@ -133,6 +134,8 @@ async fn run(
             .route("/subscriptions/confirm", web::get().to(confirm))
             .route("/newsletters", web::post().to(publish_newsletter))
             .route("/admin/dashboard", web::get().to(admin_dashboard))
+            .route("/admin/password", web::get().to(change_password_form))
+            .route("/admin/password", web::post().to(change_password))
             // Get a pointer copy and attach it to the application state
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
