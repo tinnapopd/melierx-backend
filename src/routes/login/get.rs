@@ -34,12 +34,9 @@ impl QueryParams {
 }
 
 pub async fn login_form(flash_messages: IncomingFlashMessages) -> HttpResponse {
-    let mut error_html = String::new();
-    for message in flash_messages
-        .iter()
-        .filter(|message| message.level() == Level::Error)
-    {
-        writeln!(error_html, "<p><i>{}</i></p>", message.content()).unwrap();
+    let mut message_html = String::new();
+    for message in flash_messages.iter() {
+        writeln!(message_html, "<p><i>{}</i></p>", message.content()).unwrap();
     }
 
     let html_content = format!(
@@ -51,7 +48,7 @@ pub async fn login_form(flash_messages: IncomingFlashMessages) -> HttpResponse {
             <title>Login</title>
         </head>
         <body>
-            {error_html}
+            {message_html}
             <form action="/login" method="post">
                 <label>Username
                     <input

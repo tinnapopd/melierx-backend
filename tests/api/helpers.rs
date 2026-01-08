@@ -151,6 +151,14 @@ impl TestApp {
     pub async fn get_change_password_html(&self) -> String {
         self.get_change_password().await.text().await.unwrap()
     }
+
+    pub async fn post_logout(&self) -> Response {
+        self.api_client
+            .post(&format!("{}/admin/logout", &self.address))
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
 }
 
 // Structure representing confirmation links extracted from an email.

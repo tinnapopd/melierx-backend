@@ -1,7 +1,10 @@
 use actix_web::{HttpResponse, web};
 use actix_web_flash_messages::FlashMessage;
 use secrecy::{ExposeSecret, SecretString};
+use sqlx::PgPool;
 
+use crate::authentication::{AuthError, Credentials, validate_credentials};
+use crate::routes::admin::dashboard::get_username;
 use crate::session_state::TypedSession;
 use crate::utils::{e500, see_other};
 
@@ -15,10 +18,14 @@ pub struct FormData {
 pub async fn change_password(
     form: web::Form<FormData>,
     session: TypedSession,
+    pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    if session.get_user_id().map_err(e500)?.is_none() {
+    let user_id = session.get_user_id().map_err(e500)?;
+    if user_id.is_none() {
         return Ok(see_other("/login"));
     }
+
+    let user_id = user_id.unwrap();
 
     if form.new_password.expose_secret()
         != form.new_password_check.expose_secret()
@@ -29,5 +36,37 @@ pub async fn change_password(
         .send();
         return Ok(see_other("/admin/password"));
     }
-    todo!()
+
+    if form.new_password.expose_secret().len() < 12
+        || form.new_password.expose_secret().len() > 128
+    {
+        FlashMessage::error(
+            "The new password must be between 12 and 128 characters long.",
+        )
+        .send();
+        return Ok(see_other("/admin/password"));
+    }
+
+    let username = get_username(&pool, user_id).await.map_err(e500)?;
+    let credentials = Credentials {
+        username,
+        password: form.0.current_password,
+    };
+
+    if let Err(e) = validate_credentials(&pool, credentials).await {
+        return match e {
+            AuthError::InvalidCredentials(_) => {
+                FlashMessage::error("The current password is incorrect.")
+                    .send();
+                Ok(see_other("/admin/password"))
+            }
+            AuthError::UnexpectedError(_) => Err(e500(e).into()),
+        };
+    }
+
+    crate::authentication::change_password(&pool, user_id, form.0.new_password)
+        .await
+        .map_err(e500)?;
+    FlashMessage::info("Your password has been changed.").send();
+    Ok(see_other("/admin/password"))
 }

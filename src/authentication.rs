@@ -1,4 +1,6 @@
 use anyhow::Context;
+use argon2::password_hash::{SaltString, rand_core::OsRng};
+use argon2::{Algorithm, Params, PasswordHasher, Version};
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use secrecy::{ExposeSecret, SecretString};
 use sqlx::PgPool;
@@ -60,6 +62,39 @@ pub async fn validate_credentials(
         .map_err(AuthError::InvalidCredentials)
 }
 
+/// Change the password for a given user.
+/// # Arguments
+/// * `pool` - A reference to the PostgreSQL connection pool.
+/// * `user_id` - The ID of the user whose password is to be changed.
+/// * `password` - The new password.
+/// # Returns
+/// A Result indicating success or an anyhow::Error otherwise.
+#[tracing::instrument(name = "Change password", skip(pool, password))]
+pub async fn change_password(
+    pool: &PgPool,
+    user_id: Uuid,
+    password: SecretString,
+) -> Result<(), anyhow::Error> {
+    let password_hash =
+        spawn_blocking_with_tracing(move || compute_password_hash(password))
+            .await
+            .context("Failed to spawn blocking task.")??;
+
+    sqlx::query!(
+        r#"
+        UPDATE users
+        SET password_hash = $1
+        WHERE user_id = $2
+        "#,
+        password_hash.expose_secret(),
+        user_id
+    )
+    .execute(pool)
+    .await
+    .context("Failed to execute query to change password.")?;
+    Ok(())
+}
+
 /// Verify the provided password against the expected password hash.
 /// # Arguments
 /// * `expected_password_hash` - The expected password hash.
@@ -85,6 +120,25 @@ fn verify_password_hash(
         )
         .context("Invalid password.")
         .map_err(AuthError::InvalidCredentials)
+}
+
+/// Compute the password hash for a given password.
+/// # Arguments
+/// * `password` - The password to hash.
+/// # Returns
+/// A Result containing the password hash or an anyhow::Error otherwise.
+fn compute_password_hash(
+    password: SecretString,
+) -> Result<SecretString, anyhow::Error> {
+    let salt = SaltString::generate(&mut OsRng);
+    let password_hash = Argon2::new(
+        Algorithm::Argon2id,
+        Version::V0x13,
+        Params::new(15000, 2, 1, None).unwrap(),
+    )
+    .hash_password(password.expose_secret().as_bytes(), &salt)?
+    .to_string();
+    Ok(SecretString::new(password_hash.into_boxed_str()))
 }
 
 /// Retrieve stored credentials for a given username from the database.
