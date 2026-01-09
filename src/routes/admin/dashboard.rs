@@ -1,18 +1,31 @@
-use actix_web::http::header::ContentType;
+use actix_web::http::header::{ContentType, LOCATION};
 use actix_web::{HttpResponse, web};
 use anyhow::Context;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::authentication::UserId;
+use crate::session_state::TypedSession;
 use crate::utils::e500;
 
+/// Handler for the admin dashboard page.
+/// Displays a welcome message and available actions for the logged-in admin user.
+/// If the user is not logged in, redirects to the login page.
+/// # Arguments
+/// * `pool` - A reference to the PostgreSQL connection pool.
+/// * `session` - The typed session containing user authentication information.
+/// # Returns
+/// An `HttpResponse` containing the dashboard HTML or a redirection to the login page.
 pub async fn admin_dashboard(
     pool: web::Data<PgPool>,
-    user_id: web::ReqData<UserId>,
+    session: TypedSession,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let user_id = user_id.into_inner();
-    let username = get_username(&pool, *user_id).await.map_err(e500)?;
+    let username = if let Some(user_id) = session.get_user_id().map_err(e500)? {
+        get_username(&pool, user_id).await.map_err(e500)?
+    } else {
+        return Ok(HttpResponse::SeeOther()
+            .insert_header((LOCATION, "/login"))
+            .finish());
+    };
 
     let html_content = format!(
         r#"
