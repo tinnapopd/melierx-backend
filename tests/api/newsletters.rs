@@ -54,7 +54,7 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers() {
 
     // Part1 - Submit newsletter issue
     let newsletter_request_body = serde_json::json!({
-        "title": "Newsletter Title",
+        "title": "Newsletter title",
         "text_content": "Newsletter body as plain text",
         "html_content": "<p>Newsletter body as HTML</p>"
     });
@@ -85,7 +85,7 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() {
 
     // Part1 - Submit newsletter issue
     let newsletter_request_body = serde_json::json!({
-        "title": "Newsletter Title",
+        "title": "Newsletter title",
         "text_content": "Newsletter body as plain text",
         "html_content": "<p>Newsletter body as HTML</p>"
     });
@@ -111,7 +111,7 @@ async fn you_must_be_logged_in_to_see_the_newsletter_form() {
 async fn you_must_be_logged_in_to_publish_a_newsletter() {
     let app = spawn_app().await;
     let newsletter_request_body = serde_json::json!({
-        "title": "Newsletter Title",
+        "title": "Newsletter title",
         "text_content": "Newsletter body as plain text",
         "html_content": "<p>Newsletter body as HTML</p>"
     });

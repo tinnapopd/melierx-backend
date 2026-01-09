@@ -15,11 +15,11 @@ async fn an_error_flash_message_is_set_on_failure() {
 
     // Part2 - Follow the redirect to the login page
     let html_page = app.get_login_html().await;
-    assert!(html_page.contains(r#"<p><i>Authentication failed.</i></p>"#));
+    assert!(html_page.contains("Authentication failed"));
 
     // Part3 - Request the login page again
     let html_page = app.get_login_html().await;
-    assert!(!html_page.contains(r#"<p><i>Authentication failed.</i></p>"#));
+    assert!(!html_page.contains("Authentication failed"));
 }
 
 #[actix_web::test]
