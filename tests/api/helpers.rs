@@ -30,7 +30,7 @@ static TRACING: LazyLock<()> = LazyLock::new(|| {
     };
 });
 
-// Structure representing the test application.
+/// Structure representing the test application.
 pub struct TestApp {
     pub address: String,
     pub port: u16,
@@ -80,19 +80,34 @@ impl TestApp {
         ConfirmationLinks { html, plain_text }
     }
 
-    pub async fn post_newsletters(&self, body: serde_json::Value) -> Response {
+    /// Send a GET request to the publish newsletter page
+    pub async fn get_publish_newsletter(&self) -> Response {
         self.api_client
-            .post(&format!("{}/newsletters", &self.address))
-            .basic_auth(
-                &self.test_user.username,
-                Some(&self.test_user.password),
-            )
-            .json(&body)
+            .get(&format!("{}/admin/newsletters", &self.address))
             .send()
             .await
             .expect("Failed to execute request.")
     }
 
+    /// Send a GET request to the publish newsletter page and return the HTML content
+    pub async fn get_publish_newsletter_html(&self) -> String {
+        self.get_publish_newsletter().await.text().await.unwrap()
+    }
+
+    /// Send a POST request to the newsletters endpoint
+    pub async fn post_publish_newsletter<Body>(&self, body: &Body) -> Response
+    where
+        Body: serde::Serialize,
+    {
+        self.api_client
+            .post(&format!("{}/admin/newsletters", &self.address))
+            .form(body)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
+    /// Send a GET request to the login page and return the HTML content
     pub async fn get_login_html(&self) -> String {
         self.api_client
             .get(&format!("{}/login", &self.address))
@@ -104,6 +119,7 @@ impl TestApp {
             .unwrap()
     }
 
+    /// Send a POST request to the login endpoint
     pub async fn post_login<Body>(&self, body: &Body) -> Response
     where
         Body: serde::Serialize,
@@ -116,6 +132,7 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
+    /// Send a GET request to the admin dashboard and return the response
     pub async fn get_admin_dashboard(&self) -> Response {
         self.api_client
             .get(&format!("{}/admin/dashboard", &self.address))
@@ -124,10 +141,12 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
+    /// Send a GET request to the admin dashboard and return the HTML content
     pub async fn get_admin_dashboard_html(&self) -> String {
         self.get_admin_dashboard().await.text().await.unwrap()
     }
 
+    /// Send a GET request to the change password page
     pub async fn get_change_password(&self) -> Response {
         self.api_client
             .get(&format!("{}/admin/password", &self.address))
@@ -136,6 +155,12 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
+    /// Send a GET request to the change password page and return the HTML content
+    pub async fn get_change_password_html(&self) -> String {
+        self.get_change_password().await.text().await.unwrap()
+    }
+
+    /// Send a POST request to change the password endpoint
     pub async fn post_change_password<Body>(&self, body: &Body) -> Response
     where
         Body: serde::Serialize,
@@ -148,10 +173,7 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    pub async fn get_change_password_html(&self) -> String {
-        self.get_change_password().await.text().await.unwrap()
-    }
-
+    /// Send a POST request to the logout endpoint
     pub async fn post_logout(&self) -> Response {
         self.api_client
             .post(&format!("{}/admin/logout", &self.address))
@@ -161,12 +183,13 @@ impl TestApp {
     }
 }
 
-// Structure representing confirmation links extracted from an email.
+/// Structure representing confirmation links extracted from an email.
 pub struct ConfirmationLinks {
     pub html: Url,
     pub plain_text: Url,
 }
 
+/// Structure representing a test user.
 pub struct TestUser {
     user_id: Uuid,
     pub username: String,
@@ -174,6 +197,7 @@ pub struct TestUser {
 }
 
 impl TestUser {
+    /// Generate a new test user with random credentials.
     pub fn generate() -> Self {
         Self {
             user_id: Uuid::new_v4(),
@@ -182,6 +206,16 @@ impl TestUser {
         }
     }
 
+    /// Log in the test user using the provided `TestApp`.
+    pub async fn login(&self, app: &TestApp) {
+        let login_body = serde_json::json!({
+            "username": self.username,
+            "password": self.password,
+        });
+        app.post_login(&login_body).await;
+    }
+
+    /// Store the test user in the database.
     async fn store(&self, pool: &PgPool) {
         let salt = SaltString::generate(&mut OsRng);
         let password_hash = Argon2::new(
@@ -192,7 +226,6 @@ impl TestUser {
         .hash_password(self.password.as_bytes(), &salt)
         .unwrap()
         .to_string();
-        dbg!(&password_hash);
 
         sqlx::query!(
             r#"
