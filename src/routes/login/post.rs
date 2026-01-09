@@ -4,16 +4,15 @@ use actix_web::error::InternalError;
 use actix_web::http::header::LOCATION;
 use actix_web::{HttpResponse, web};
 use actix_web_flash_messages::FlashMessage;
-use hmac::{Hmac, Mac};
-use secrecy::{ExposeSecret, SecretString};
+use secrecy::SecretString;
 use sqlx::PgPool;
 
 use crate::authentication::AuthError;
 use crate::authentication::{Credentials, validate_credentials};
 use crate::routes::error_chain_fmt;
 use crate::session_state::TypedSession;
-use crate::startup::HmacSecret;
 
+/// Error type for login failures.
 #[derive(thiserror::Error)]
 pub enum LoginError {
     #[error("Authentication failed.")]
@@ -28,12 +27,20 @@ impl fmt::Debug for LoginError {
     }
 }
 
+/// Form data structure for login.
 #[derive(serde::Deserialize)]
 pub struct FormData {
     pub username: String,
     pub password: SecretString,
 }
 
+/// Handles user login.
+/// # Arguments
+/// * `pool` - A reference to the PostgreSQL connection pool.
+/// * `session` - The typed session for managing user sessions.
+/// * `form` - The form data containing username and password.
+/// # Returns
+/// A Result indicating success or failure of the login process.
 #[tracing::instrument(
     skip(pool, session, form)
     fields(

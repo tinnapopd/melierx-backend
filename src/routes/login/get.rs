@@ -1,38 +1,14 @@
 use std::fmt::Write;
 
-use actix_web::cookie::{Cookie, time::Duration};
+use actix_web::HttpResponse;
 use actix_web::http::header::ContentType;
-use actix_web::{HttpRequest, HttpResponse};
-use actix_web_flash_messages::{IncomingFlashMessages, Level};
-use hmac::{Hmac, Mac};
-use secrecy::ExposeSecret;
+use actix_web_flash_messages::IncomingFlashMessages;
 
-use crate::startup::HmacSecret;
-
-/// Query parameters for login form error display.
-#[derive(serde::Deserialize)]
-pub struct QueryParams {
-    error: String,
-    tag: String,
-}
-
-impl QueryParams {
-    fn verify(self, secret: &HmacSecret) -> Result<String, anyhow::Error> {
-        let tag = hex::decode(self.tag)?;
-        let query_string =
-            format!("error={}", urlencoding::Encoded::new(&self.error));
-
-        let mut mac = Hmac::<sha2::Sha256>::new_from_slice(
-            secret.0.expose_secret().as_bytes(),
-        )
-        .unwrap();
-        mac.update(query_string.as_bytes());
-        mac.verify_slice(&tag)?;
-
-        Ok(self.error)
-    }
-}
-
+/// Handler to serve the login form.
+/// Arguments:
+/// - `flash_messages`: Incoming flash messages to be displayed on the login page.
+/// Returns:
+/// - `HttpResponse`: The HTTP response containing the login form HTML.
 pub async fn login_form(flash_messages: IncomingFlashMessages) -> HttpResponse {
     let mut message_html = String::new();
     for message in flash_messages.iter() {
