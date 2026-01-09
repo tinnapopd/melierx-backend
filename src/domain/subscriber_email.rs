@@ -2,7 +2,7 @@ use std::fmt;
 
 use validator::ValidateEmail;
 
-// Subscriber email newtype.
+/// Subscriber email newtype.
 #[derive(Debug)]
 pub struct SubscriberEmail(String);
 
@@ -55,7 +55,7 @@ mod tests {
         assert_err!(SubscriberEmail::parse(email));
     }
 
-    // Structure for generating valid email fixtures.
+    /// Structure for generating valid email fixtures.
     #[derive(Debug, Clone)]
     struct ValidEmailFixture(pub String);
 
