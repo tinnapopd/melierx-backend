@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::telemetry::spawn_blocking_with_tracing;
 
-// Error type for authentication failures.
+/// Error type for authentication failures.
 #[derive(thiserror::Error, Debug)]
 pub enum AuthError {
     #[error("Invalid credentials.")]
@@ -17,7 +17,7 @@ pub enum AuthError {
     UnexpectedError(#[from] anyhow::Error),
 }
 
-// Basic authentication credentials structure.
+/// Basic authentication credentials structure.
 pub struct Credentials {
     pub username: String,
     pub password: SecretString,
@@ -78,7 +78,7 @@ pub async fn change_password(
     let password_hash =
         spawn_blocking_with_tracing(move || compute_password_hash(password))
             .await
-            .context("Failed to spawn blocking task.")??;
+            .context("Failed to compute password hash.")??;
 
     sqlx::query!(
         r#"

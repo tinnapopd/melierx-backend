@@ -4,7 +4,7 @@ use crate::domain::SubscriberEmail;
 use reqwest::{Client, Url};
 use secrecy::{ExposeSecret, SecretString};
 
-// Email client structure.
+/// Email client structure.
 pub struct EmailClient {
     http_client: Client,
     base_url: Url,
@@ -58,7 +58,7 @@ impl EmailClient {
     }
 }
 
-// Request body structure for sending emails.
+/// Request body structure for sending emails.
 #[derive(serde::Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct SendEmailRequest<'a> {
@@ -131,7 +131,6 @@ mod tests {
 
     #[actix_web::test]
     async fn send_email_sends_the_expected_request() {
-        // Arrange
         let mock_server = MockServer::start().await;
         let base_url = reqwest::Url::parse(&mock_server.uri()).unwrap();
         let email_client = email_client(base_url);
@@ -146,17 +145,13 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        // Act
         let _ = email_client
             .send_email(&email(), &subject(), &content(), &content())
             .await;
-
-        // Assert
     }
 
     #[actix_web::test]
     async fn send_email_succeeds_if_server_returns_200() {
-        // Arrange
         let mock_server = MockServer::start().await;
         let base_url = reqwest::Url::parse(&mock_server.uri()).unwrap();
         let email_client = email_client(base_url);
@@ -167,18 +162,15 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        // Act
         let outcome = email_client
             .send_email(&email(), &subject(), &content(), &content())
             .await;
 
-        // Assert
         assert_ok!(outcome);
     }
 
     #[actix_web::test]
     async fn send_email_fails_if_server_returns_500() {
-        // Arrange
         let mock_server = MockServer::start().await;
         let base_url = reqwest::Url::parse(&mock_server.uri()).unwrap();
         let email_client = email_client(base_url);
@@ -189,18 +181,15 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        // Act
         let outcome = email_client
             .send_email(&email(), &subject(), &content(), &content())
             .await;
 
-        // Assert
         assert_err!(outcome);
     }
 
     #[actix_web::test]
     async fn send_email_times_out_if_server_takes_too_long() {
-        // Arrange
         let mock_server = MockServer::start().await;
         let base_url = reqwest::Url::parse(&mock_server.uri()).unwrap();
         let email_client = email_client(base_url);
@@ -214,12 +203,10 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        // Act
         let outcome = email_client
             .send_email(&email(), &subject(), &content(), &content())
             .await;
 
-        // Assert
         assert_err!(outcome);
     }
 }

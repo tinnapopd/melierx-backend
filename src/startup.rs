@@ -17,11 +17,12 @@ use tracing_actix_web::TracingLogger;
 use crate::authentication::reject_anonymous_users;
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
-use crate::routes::{admin_dashboard, publish_newsletter, subscribe};
+use crate::routes::admin_dashboard;
 use crate::routes::{change_password, change_password_form};
 use crate::routes::{confirm, health_check, home, log_out, login, login_form};
+use crate::routes::{publish_newsletter, publish_newsletter_form, subscribe};
 
-// Application struct representing the running application.
+/// Application struct representing the running application.
 pub struct Application {
     pub port: u16,
     pub server: Server,
@@ -85,10 +86,10 @@ impl Application {
     }
 }
 
-// Newtype for application base URL.
+/// Newtype for application base URL.
 pub struct ApplicationBaseUrl(pub String);
 
-// Newtype for HMAC secret.
+/// Newtype for HMAC secret.
 #[derive(Clone)]
 pub struct HmacSecret(pub SecretString);
 
@@ -141,6 +142,11 @@ async fn run(
                     .route("/dashboard", web::get().to(admin_dashboard))
                     .route("/password", web::get().to(change_password_form))
                     .route("/password", web::post().to(change_password))
+                    .route(
+                        "/newsletters",
+                        web::get().to(publish_newsletter_form),
+                    )
+                    .route("/newsletters", web::post().to(publish_newsletter))
                     .route("/logout", web::post().to(log_out)),
             )
             // Get a pointer copy and attach it to the application state

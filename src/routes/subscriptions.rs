@@ -32,7 +32,7 @@ impl TryFrom<FormData> for NewSubscriber {
     }
 }
 
-// Error type for subscription process.
+/// Error type for subscription process.
 #[derive(thiserror::Error)]
 pub enum SubscribeError {
     #[error("{0}")]
@@ -249,7 +249,7 @@ pub fn error_chain_fmt(
     write!(f, "{}\n", e)?;
     let mut current = e.source();
     while let Some(cause) = current {
-        write!(f, "Caused by:\n\t{}", cause)?;
+        writeln!(f, "Caused by:\n\t{}", cause)?;
         current = cause.source();
     }
     Ok(())

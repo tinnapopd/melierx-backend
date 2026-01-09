@@ -8,7 +8,7 @@ use sqlx::postgres::{PgConnectOptions, PgSslMode};
 
 use crate::domain::SubscriberEmail;
 
-// Environment enum to distinguish between local and production settings.
+/// Environment enum to distinguish between local and production settings.
 pub enum Environment {
     Local,
     Production,
@@ -48,7 +48,7 @@ pub struct ApplicationSettings {
     pub hmac_secret: SecretString,
 }
 
-// Database settings structure.
+/// Database settings structure.
 #[derive(serde::Deserialize, Clone)]
 pub struct DatabaseSettings {
     pub host: String,
@@ -78,7 +78,7 @@ impl DatabaseSettings {
     }
 }
 
-// Email client settings structure.
+/// Email client settings structure.
 #[derive(serde::Deserialize, Clone)]
 pub struct EmailClientSettings {
     pub base_url: String,
@@ -98,7 +98,7 @@ impl EmailClientSettings {
     }
 }
 
-// Facade settings structure.
+/// Facade settings structure.
 #[derive(serde::Deserialize, Clone)]
 pub struct Settings {
     pub database: DatabaseSettings,

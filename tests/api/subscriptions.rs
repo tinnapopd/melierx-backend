@@ -5,7 +5,6 @@ use crate::helpers::spawn_app;
 
 #[actix_web::test]
 async fn subscribe_returns_a_200_for_valid_form_data() {
-    // Arrange
     let app = spawn_app().await;
     let body = "name=FirstName%20LastName&email=mynickname%40gmail.com";
 
@@ -15,23 +14,18 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
         .mount(&app.email_server)
         .await;
 
-    // Act
     let response = app.post_subscriptions(body.into()).await;
 
-    // Assert
     assert_eq!(response.status().as_u16(), 200);
 }
 
 #[actix_web::test]
 async fn subscribe_persists_the_new_subscriber_in_the_database() {
-    // Arrange
     let app = spawn_app().await;
     let body = "name=FirstName%20LastName&email=mynickname%40gmail.com";
 
-    // Act
     app.post_subscriptions(body.into()).await;
 
-    // Assert
     let saved = sqlx::query!("SELECT email, name, status FROM subscriptions",)
         .fetch_one(&app.db_pool)
         .await
@@ -44,7 +38,6 @@ async fn subscribe_persists_the_new_subscriber_in_the_database() {
 
 #[actix_web::test]
 async fn subscribe_fails_if_there_is_a_fatal_database_error() {
-    // Arrange
     let app = spawn_app().await;
     let body = "name=FirstName%20LastName&email=mynickname%40gmail.com";
 
@@ -53,16 +46,13 @@ async fn subscribe_fails_if_there_is_a_fatal_database_error() {
         .await
         .unwrap();
 
-    // Act
     let response = app.post_subscriptions(body.into()).await;
 
-    // Assert
     assert_eq!(response.status().as_u16(), 500);
 }
 
 #[actix_web::test]
 async fn subscribe_sends_a_confirmation_email_for_valid_data() {
-    // Arrange
     let app = spawn_app().await;
     let body = "name=FirstName%20LastName&email=mynickname%40gmail.com";
 
@@ -73,15 +63,11 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() {
         .mount(&app.email_server)
         .await;
 
-    // Act
     app.post_subscriptions(body.into()).await;
-
-    // Assert
 }
 
 #[actix_web::test]
 async fn subscribe_sends_a_confirmation_email_with_a_link() {
-    // Arrange
     let app = spawn_app().await;
     let body = "name=FirstName%20LastName&email=mynickname%40gmail.com";
 
@@ -91,20 +77,16 @@ async fn subscribe_sends_a_confirmation_email_with_a_link() {
         .mount(&app.email_server)
         .await;
 
-    // Act
     app.post_subscriptions(body.into()).await;
 
-    // Assert
     let email_request = &app.email_server.received_requests().await.unwrap()[0];
     let confirmation_links = app.get_confirmation_links(email_request);
 
-    // Assert that the links are the same
     assert_eq!(confirmation_links.html, confirmation_links.plain_text);
 }
 
 #[actix_web::test]
 async fn subscribe_returns_a_400_when_data_is_missing() {
-    // Arrange
     let app = spawn_app().await;
     let test_cases = vec![
         ("name=FirstName%20LastName", "missing the email"),
@@ -113,10 +95,7 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
     ];
 
     for (invalid_body, error_message) in test_cases {
-        // Act
         let response = app.post_subscriptions(invalid_body.into()).await;
-
-        // Assert
         assert_eq!(
             response.status().as_u16(),
             400,
@@ -128,7 +107,6 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
 
 #[actix_web::test]
 async fn subscribe_returns_a_400_when_fields_are_present_but_invalid() {
-    // Arrange
     let app = spawn_app().await;
     let test_cases = vec![
         ("name=&email=mynickname%40gmail.com", "empty name"),
@@ -140,10 +118,7 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_invalid() {
     ];
 
     for (body, description) in test_cases {
-        // Act
         let response = app.post_subscriptions(body.into()).await;
-
-        // Assert
         assert_eq!(
             response.status().as_u16(),
             400,

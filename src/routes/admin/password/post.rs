@@ -26,7 +26,7 @@ pub async fn change_password(
         != form.new_password_check.expose_secret()
     {
         FlashMessage::error(
-            "You entered two different new passwords - the fields values must match.",
+            "You entered two different new passwords - the field values must match.",
         )
         .send();
         return Ok(see_other("/admin/password"));
