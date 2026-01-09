@@ -6,13 +6,13 @@ use uuid::Uuid;
 
 use crate::routes::error_chain_fmt;
 
-// Query parameters structure for subscription confirmation.
+/// Query parameters structure for subscription confirmation.
 #[derive(serde::Deserialize)]
 pub struct Parameters {
     subscription_token: String,
 }
 
-// Error type for subscription confirmation failures.
+/// Error type for subscription confirmation failures.
 #[derive(thiserror::Error)]
 pub enum ConfirmationError {
     #[error(transparent)]
