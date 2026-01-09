@@ -1,3 +1,4 @@
+use std::fmt;
 use std::ops::Deref;
 
 use actix_web::body::MessageBody;
@@ -13,6 +14,12 @@ use crate::utils::{e500, see_other};
 /// A newtype for the user ID extracted from the session.
 #[derive(Debug, Clone, Copy)]
 pub struct UserId(Uuid);
+
+impl fmt::Display for UserId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 impl Deref for UserId {
     type Target = Uuid;
