@@ -7,6 +7,7 @@ use serde_aux::field_attributes::deserialize_number_from_string;
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 
 use crate::domain::SubscriberEmail;
+use crate::email_client::EmailClient;
 
 /// Environment enum to distinguish between local and production settings.
 pub enum Environment {
@@ -95,6 +96,22 @@ impl EmailClientSettings {
 
     pub fn timeout(&self) -> Duration {
         Duration::from_millis(self.timeout_milliseconds)
+    }
+
+    pub fn client(self) -> EmailClient {
+        let sender_email =
+            self.sender().expect("Invalid sender email address.");
+        let timeout = self.timeout();
+        let base_url = self
+            .base_url
+            .parse()
+            .expect("Invalid email client base URL");
+        EmailClient::new(
+            base_url,
+            sender_email,
+            self.authorization_token,
+            timeout,
+        )
     }
 }
 
