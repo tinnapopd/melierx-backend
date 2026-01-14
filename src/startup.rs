@@ -39,23 +39,7 @@ impl Application {
             .await
             .expect("Failed to create database connection pool.");
 
-        let sender_email = configuration
-            .email_client
-            .sender()
-            .expect("Invalid sender email address.");
-        let timeout = configuration.email_client.timeout();
-        let base_url = configuration
-            .email_client
-            .base_url
-            .parse()
-            .expect("Invalid email client base URL");
-        let email_client = EmailClient::new(
-            base_url,
-            sender_email,
-            configuration.email_client.authorization_token,
-            timeout,
-        );
-
+        let email_client = configuration.email_client.client();
         let address = format!(
             "{}:{}",
             configuration.application.host, configuration.application.port

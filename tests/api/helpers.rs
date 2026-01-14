@@ -12,6 +12,10 @@ use uuid::Uuid;
 use wiremock::{MockServer, Request};
 
 use melierx_backend::configuration::{DatabaseSettings, get_configuration};
+use melierx_backend::email_client::EmailClient;
+use melierx_backend::issue_delivery_worker::{
+    ExecutionOutcome, try_execute_task,
+};
 use melierx_backend::startup::{Application, get_connection_pool};
 use melierx_backend::telemetry::{get_subscriber, init_subscriber};
 
@@ -38,6 +42,7 @@ pub struct TestApp {
     pub email_server: MockServer,
     pub test_user: TestUser,
     pub api_client: Client,
+    pub email_client: EmailClient,
 }
 
 impl TestApp {
@@ -181,6 +186,18 @@ impl TestApp {
             .await
             .expect("Failed to execute request.")
     }
+
+    pub async fn dispatch_all_pending_emails(&self) {
+        loop {
+            if let ExecutionOutcome::EmptyQueue =
+                try_execute_task(&self.db_pool, &self.email_client)
+                    .await
+                    .unwrap()
+            {
+                break;
+            }
+        }
+    }
 }
 
 /// Structure representing confirmation links extracted from an email.
@@ -289,6 +306,7 @@ pub async fn spawn_app() -> TestApp {
         email_server,
         test_user: TestUser::generate(),
         api_client: client,
+        email_client: configuration.email_client.client(),
     };
     test_app.test_user.store(&test_app.db_pool).await;
     test_app
